@@ -1,0 +1,45 @@
+# Local source-review cache and machine-specific records.
+/analysis/
+
+# Runtime dependencies and build output.
+/.venv/
+/node_modules/
+/**/node_modules/
+/__pycache__/
+**/__pycache__/
+*.py[cod]
+/.mypy_cache/
+/.ruff_cache/
+/dist/
+/build/
+*.egg-info/
+
+# Private development product data. Never commit profiles, releases, or recovery copies.
+/.local-data/
+
+# Browser state, downloads, and detector-run output.
+/.runtime/
+/.cache/
+/profiles/
+/artifacts/
+/downloads/
+/logs/
+/evidence/local/
+*.log
+*.har
+*.trace.zip
+
+# Credentials and local settings.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+/local-settings.json
+
+# Platform files.
+.DS_Store
+Thumbs.db
+Desktop.ini

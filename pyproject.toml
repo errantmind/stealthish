@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "stealthish"
+version = "0.1.0.dev5"
+description = "Standalone browser for local AI workflows. Development build."
+requires-python = ">=3.13,<3.15"
+dependencies = ["patchright==1.64.4", "greenlet==3.5.6", "pyee==14.0.0", "typing-extensions==4.16.0", "trafilatura==2.3.1"]
+
+[project.scripts]
+stealthish = "stealthish.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/stealthish"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/stealthish", "pyproject.toml", "uv.lock"]
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["src/stealthish/_vendor"]

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "kagi", "name": "Kagi", "url": "https://kagi.com/search", "queryParam": "q", "domain": "kagi.com",
+    "containers": "div._0_SRI.search-result, div.__srgi", "link": "h3.__sri-title-box a, h3.__srgi-title a, a.__sri_title_link", "snippet": ".__sri-desc",
+    "guidance": "Kagi supports site:, filetype:, inurl:, intitle:, quotes, AND/OR, exclusions, wildcards and bangs. Bangs may redirect outside Kagi."
+  },
+  {
+    "id": "google", "name": "Google", "url": "https://www.google.com/search", "queryParam": "q", "domain": "google.com",
+    "containers": "#search .MjjYud, #search .g, #search .Gx5Zad", "link": "a:has(h3)", "snippet": ".VwiC3b, .IsZvec, .aCOpRe",
+    "guidance": "Use plain queries, quotes, site:, filetype:, intitle:, inurl: and exclusions. Do not assume Kagi bangs are supported."
+  },
+  {
+    "id": "bing", "name": "Bing", "url": "https://www.bing.com/search", "queryParam": "q", "domain": "bing.com",
+    "containers": "li.b_algo", "link": "h2 a", "snippet": ".b_caption p, p.b_lineclamp2",
+    "guidance": "Use plain queries, quotes, site:, filetype:, intitle: and exclusions. Do not assume Kagi bangs are supported."
+  },
+  {
+    "id": "yahoo", "name": "Yahoo", "url": "https://search.yahoo.com/search", "queryParam": "p", "domain": "yahoo.com",
+    "containers": "div.algo, li.algo", "link": "h3 a", "snippet": ".compText p, .compText",
+    "guidance": "Prefer plain queries, quotes and site:. Other operators vary; do not assume Kagi bangs are supported."
+  },
+  {
+    "id": "duckduckgo", "name": "DuckDuckGo", "url": "https://duckduckgo.com/", "queryParam": "q", "domain": "duckduckgo.com",
+    "containers": "[data-testid='result'], .result", "link": "a[data-testid='result-title-a'], a.result__a, h2 a", "snippet": "[data-result='snippet'], [data-testid='result-snippet'], .result__snippet",
+    "guidance": "Use plain queries, quotes, site: and exclusions. DuckDuckGo has bangs, but they may redirect to another site and differ from Kagi."
+  },
+  {
+    "id": "brave", "name": "Brave", "url": "https://search.brave.com/search", "queryParam": "q", "domain": "brave.com",
+    "containers": "div.snippet[data-type='web'], div.snippet:not([data-type]), [data-testid='web-result']", "link": "a.heading-serp, a:has(.title), a[data-testid='result-title']", "snippet": ".snippet-description, .snippet-content",
+    "guidance": "Use plain queries, quotes, site:, filetype: and exclusions. Do not assume Kagi-specific bangs are supported."
+  }
+]

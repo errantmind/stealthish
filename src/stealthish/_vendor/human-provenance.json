@@ -1,0 +1,72 @@
+{
+  "upstream": "https://github.com/CloakHQ/CloakBrowser",
+  "revision": "b860957b1299967e1f0226b629b1da2d36e53c82",
+  "license": "MIT",
+  "files": [
+    {
+      "file": "LICENSE",
+      "sourceSHA256": "93a9c5b5542faf5ff6c7956406b56930fde10bd4d3e8dc7b89f01a88a8d2b29b",
+      "adaptedSHA256": "93a9c5b5542faf5ff6c7956406b56930fde10bd4d3e8dc7b89f01a88a8d2b29b"
+    },
+    {
+      "file": "__init__.py",
+      "sourceSHA256": "8a66361a074b8e2a5fe443855a6dacfc2d49dd2cdb777fb466392464fc31fadf",
+      "adaptedSHA256": "8a66361a074b8e2a5fe443855a6dacfc2d49dd2cdb777fb466392464fc31fadf"
+    },
+    {
+      "file": "config.py",
+      "sourceSHA256": "9e0bbf5a44c4dae89ed82bd3b4149aa0654edcf8db4b07dc6d8a0f693419ef16",
+      "adaptedSHA256": "9e0bbf5a44c4dae89ed82bd3b4149aa0654edcf8db4b07dc6d8a0f693419ef16"
+    },
+    {
+      "file": "engine.py",
+      "sourceSHA256": "bf74e62e41c0c53f58125983e175c9de4942032bbf830f84d14da549b0396c13",
+      "adaptedSHA256": "f53c8ec765e4728df5cda00eb210808c38bcc1db02e627978b0a132ab6f66757"
+    },
+    {
+      "file": "errors.py",
+      "sourceSHA256": "a1cee051f1a07c2cb37cf82a8844d3ee078a06cef8e5d68249eb2e650edf150e",
+      "adaptedSHA256": "a1cee051f1a07c2cb37cf82a8844d3ee078a06cef8e5d68249eb2e650edf150e"
+    },
+    {
+      "file": "fields.py",
+      "sourceSHA256": "0e915ae8d2ffce3a5158ac8e65425e35707fcb95698e37bf445069c6a2502e13",
+      "adaptedSHA256": "0e915ae8d2ffce3a5158ac8e65425e35707fcb95698e37bf445069c6a2502e13"
+    },
+    {
+      "file": "injected.py",
+      "sourceSHA256": "8bfbc3e4be4ab7377e93b4abbd922e00064a957af80ed669f35cd89c55098002",
+      "adaptedSHA256": "19d81d70a5c871edd7545c0f5160e54ecdb42eb457562b14cbbc4e133eda24d1"
+    },
+    {
+      "file": "keyboard.py",
+      "sourceSHA256": "0ba519195f63f101da77fc7bddcdaeb2989b7f1c7207f421ff01a367ffa43765",
+      "adaptedSHA256": "0ba519195f63f101da77fc7bddcdaeb2989b7f1c7207f421ff01a367ffa43765"
+    },
+    {
+      "file": "mouse.py",
+      "sourceSHA256": "0d7c18132b8f90342a8b37cf60e86439e78af9ad0a2024f25e68628227a71798",
+      "adaptedSHA256": "0d7c18132b8f90342a8b37cf60e86439e78af9ad0a2024f25e68628227a71798"
+    },
+    {
+      "file": "patch.py",
+      "sourceSHA256": "c4e1165422f555cd1ace3bb6d42090ce60438a9e3d8645649f312023543c0e79",
+      "adaptedSHA256": "9aad1a4129b8136f6362b0564e11c32b6882227eb30e3dd29e78a7d128d4c157"
+    },
+    {
+      "file": "world.py",
+      "sourceSHA256": "6a30fd56877e9b038a26dc47827a4d34d26911ecb220b2ea7370784b732f2564",
+      "adaptedSHA256": "ff3a0d2e2f2421ca5a38b055f6df48fef676d4a9460e4b1df8a5b560520e6ada"
+    }
+  ],
+  "changes": [
+    "Map playwright imports to patchright.",
+    "Register key release before awaited key-down dispatch."
+  ],
+  "excluded": [
+    "CloakBrowser initializer",
+    "browser",
+    "downloader",
+    "license service"
+  ]
+}
