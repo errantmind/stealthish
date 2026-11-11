@@ -1,0 +1,31 @@
+{
+  "uv": {
+    "version": "0.13.7",
+    "installers": {
+      "posix": {
+        "url": "https://astral.sh/uv/0.13.7/install.sh",
+        "sha256": "d263ee68314cf5bea36b08e6bd9e2c4563240d7adb73756cf33af5c199b92db4"
+      },
+      "win32": {
+        "url": "https://astral.sh/uv/0.13.7/install.ps1",
+        "sha256": "d9e70de578ea2653b631a5933c0296368fca4c91f412b46680661b81bbc399e0"
+      }
+    }
+  },
+  "python": {
+    "cpython-3.14.9-linux-x86_64-gnu": {
+      "name": "cpython",
+      "arch": {"family": "x86_64", "variant": null},
+      "os": "linux",
+      "libc": "gnu",
+      "major": 3,
+      "minor": 14,
+      "patch": 9,
+      "prerelease": "",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261021/cpython-3.14.9%2B20261021-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "sha256": "561e91c1cadf30e84aec94d1917384ae3267e5f3e6e135e51fd1578bb19f4064",
+      "variant": null,
+      "build": "20261021"
+    }
+  }
+}

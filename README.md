@@ -1,44 +1,48 @@
 # Stealthish
 
-A standalone browser CLI and async Python API for local AI workflows. Headless by default, persistent profiles, careful input, gorhill blocking, and manual updates.
+A standalone browser CLI and async Python API for local AI workflows. Headless by default, persistent profiles, careful native input, and gorhill blocking. The Pi extension uses private pipes and its existing ownership queue, not a shared browser service.
 
-**Current build: 0.1.0.dev5 — Linux development release with a Pi adapter.** The existing Pi extension selects an independently installed runtime after `/reload`. It retains its ownership queue; the product has no shared browser service. Windows validation, profile migration, and unattended updates remain deferred. Manual access uses the existing headed control, not a separate login command.
+**Current source: `0.1.0.dev6`. Automatic Linux setup is implemented and checked locally. Public release assets are not uploaded yet.** See [publishing](docs/publishing.md) before distributing the new extension pin or reloading the normal installed instance.
 
-## Use the prepared instance
+## Automatic Pi setup
 
-```sh
-~/.local/share/stealthish/stealthish status
-~/.local/share/stealthish/stealthish run
+Once the pinned release assets are published, the first browser request installs any missing components and continues the request:
+
+```text
+Official pinned uv installer, if needed
+    -> managed Python and locked application wheels
+    -> exact private Chrome and gorhill packages
+    -> profile-safe activation and readiness
+    -> requested browsing action
 ```
 
-`run` accepts one JSON request per line. See [Pi instructions](docs/pi-browser.md) for `/reload`, manual access, and backend selection. See [operating instructions](docs/operating.md) for standalone setup, CLI/API examples, updates, and recovery. The older project-local `.local-data/` instance is not Pi's runtime.
+No separate Stealthish clone, system Python, PATH edit, backend-selection setting, or setup command. Later starts verify and reuse the release. A changed extension pin activates a prepared release with matching profile recovery; damaged private files receive a separate repair copy. There is no independent latest-version updater or legacy backend fallback.
 
-Normal workflows use real websites. Python documentation and MDN worked through the installed product. **Kagi reached human verification; authenticated search remains unverified.** The early redirect exposed a pause-classification fault, corrected without retrying the challenge. No public Cloudflare acceptance is claimed.
+The current manifest supports **Linux x86-64 with glibc 2.31+, native browser libraries, and working Vulkan GPU support**. The measured host uses NVIDIA. Windows/macOS browser ports and native validation remain unfinished. Official uv installer branches alone are not browser support.
 
-Final local bot-detection integration runs retained practical acceptance in both startup orders. Known worker, scrolling, GPU, optional-API, and PDF limits remain. See [the latest results](docs/research/2026-11-11-pi-integration-results.md).
+## Use and evidence
 
-## Key documents
+All nine Pi browser tools and `/browser` controls remain. Explicit headed access permits human sign-in; automation is blocked until control returns. Existing account profiles are not imported automatically. Standalone CLI/API and manual recovery remain available.
 
-- [Pi browser instructions](docs/pi-browser.md)
-- [Operating instructions](docs/operating.md)
+Real Python documentation and MDN use passed through automatic setup and the registered adapter. Two concurrent clients performed one installation and then browsed in sequence. Missing-browser repair worked. Two local detector runs using the managed runtime retained the earlier practical six-suite results, including behavioral acceptance at 0.30.
+
+**Kagi authentication and public Cloudflare acceptance remain unverified.** No challenge retry or public detector request was made. Keep known worker, scrolling, GPU, optional-API, and PDF limits explicit.
+
+## Documents
+
+- [Design decisions and development boundaries](DESIGN.md)
+- [Publication and automatic setup](docs/publishing.md)
+- [Pi instructions](docs/pi-browser.md)
+- [Standalone operating instructions](docs/operating.md)
+- [Latest setup results](docs/research/2026-11-11-automatic-setup-results.md)
 - [Preserved concealment decisions](docs/concealment.md)
-- [Manual updates](docs/manual-updates.md)
 - [Runtime architecture](docs/runtime-architecture.md)
 - [Product specification](docs/product-spec.md)
+- [Manual recovery procedure](docs/manual-updates.md)
 - [Remaining work](docs/roadmap.md)
 - [Handoff](docs/HANDOFF.md)
-- [Detector integration commands](docs/detector-checks.md)
-- [Evidence index](docs/validation-plan.md)
-- [Cleanup record](docs/cleanup.md)
+- [Bot-detection integration commands](docs/detector-checks.md)
 
-## Layout
+`src/stealthish/` is the product. `src/stealthish_lab/` and `fixtures/` contain only detector integration support and are not shipped. `distribution/` and `tools/build_release.py` define publication inputs. Browser binaries, environments, profiles, backups, and raw outputs stay outside Git.
 
-| Path | Purpose |
-| --- | --- |
-| `src/stealthish/` | Standalone product, acquisition, and foreground maintenance. |
-| `src/stealthish_lab/`, `fixtures/` | Bot-detection integration support only; excluded from the product wheel. |
-| `tools/` | Selected asset preparation and detector integration commands. |
-| `docs/`, `docs/research/`, `evidence/` | Contracts, findings, historical results, and recorded hashes. |
-| `pyproject.toml`, `uv.lock` | Packaging and pinned dependencies. |
-
-Unit tests, fake Kagi, and general synthetic functional suites are not part of the project. Only bot-detection integration checks remain. Browser assets, profiles, backups, and raw output stay outside Git. Only the approved browser extension and backend selection changed. The original CloakBrowser profile and accounts were not imported or changed by this work.
+No unit tests, fake Kagi pages, or general synthetic website suites. Normal workflow checks use real sites. The original installed profile and accounts remain unchanged by this development.

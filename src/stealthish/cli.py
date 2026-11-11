@@ -108,9 +108,9 @@ def selected_environment(config, argv):
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
-    parser = argparse.ArgumentParser(prog="stealthish", description="Standalone headless browser. Manual updates.")
+    parser = argparse.ArgumentParser(prog="stealthish", description="Standalone browser with pinned release setup.")
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("run", "status", "prepare", "activate", "recover", "_verify"):
+    for name in ("run", "status", "prepare", "activate", "recover", "ensure", "_verify"):
         item = sub.add_parser(name)
         item.add_argument("--data-dir", type=Path)
         if name in ("run", "status"):
@@ -122,6 +122,9 @@ def main(argv=None):
             item.add_argument("--release", required=True)
         if name == "recover":
             item.add_argument("--accept-data-loss", action="store_true")
+        if name == "ensure":
+            item.add_argument("--manifest", type=Path, required=True)
+            item.add_argument("--sha256", required=True)
         if name == "_verify":
             item.add_argument("--owner-fd", type=int, required=True)
             item.add_argument("--initialize", action="store_true")
@@ -133,7 +136,10 @@ def main(argv=None):
             if args.command == "_verify":
                 asyncio.run(maintenance.verify_child(root, args.release, args.owner_fd, args.initialize))
                 return 0
-            if args.command == "prepare":
+            if args.command == "ensure":
+                from .provision import ensure
+                result = ensure(root, args.manifest, args.sha256)
+            elif args.command == "prepare":
                 result = maintenance.prepare(root, args.release)
             elif args.command == "activate":
                 result = maintenance.activate(root, args.release)

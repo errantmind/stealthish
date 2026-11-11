@@ -4,6 +4,7 @@ MESSAGES = {
     "INVALID_CONFIG": "The configuration is invalid.",
     "INVALID_REQUEST": "The request is invalid.",
     "PROFILE_BUSY": "Another process owns this data directory.",
+    "PROFILE_DOWNGRADE_BLOCKED": "This profile used a newer browser. A matching recovery decision is required.",
     "SESSION_BUSY": "A browser operation is already active.",
     "SESSION_CLOSED": "The session is closed.",
     "RELEASE_INVALID": "The selected release failed verification.",

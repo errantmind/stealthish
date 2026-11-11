@@ -10,7 +10,7 @@ import sys
 
 from .errors import StartupError
 
-VERSION = "0.1.0.dev5"
+VERSION = "0.1.0.dev6"
 DRIVER_VERSION = "1.64.4"
 DEPENDENCIES = {
     "patchright": DRIVER_VERSION, "greenlet": "3.5.6", "pyee": "14.0.0", "typing-extensions": "4.16.0",
@@ -90,7 +90,8 @@ def load_release(config, *, _maintenance=False) -> Release:
                     "driverVersion", "browserVersion", "blockerVersion", "browserExecutable",
                     "files", "runtimeFiles", "dependencyVersions", "provenance", "validation"}
         environment = {"environmentPath", "environmentFiles", "pythonVersion"}
-        if (set(data) not in (expected, expected | environment)
+        optional = {"automaticSetup"}
+        if (set(data) - optional not in (expected, expected | environment)
                 or data["schemaVersion"] != 1 or data["release"] != config.release):
             raise ValueError()
         if environment <= data.keys():

@@ -5,7 +5,9 @@ from pathlib import Path
 import shutil
 import stat
 import tarfile
+import time
 import urllib.request
+import uuid
 import zipfile
 
 from .errors import StartupError
@@ -24,10 +26,12 @@ def download(directory, name, url, expected):
     private_directory(directory)
     target = child(directory, name)
     if target.exists():
-        if digest(target) != expected:
-            raise StartupError("ACQUISITION_FAILED")
-        return target
-    temporary = target.with_suffix(target.suffix + ".part")
+        if digest(target) == expected:
+            return target
+        # Retain an invalid cache object; never use it as an executable.
+        target.rename(target.with_name(target.name + ".invalid-" + uuid.uuid4().hex[:8]))
+    temporary = target.with_name(target.name + "." + uuid.uuid4().hex + ".part")
+    deadline = time.monotonic() + 600
     try:
         with urllib.request.urlopen(url, timeout=60) as source, temporary.open("xb") as out:
             if not source.url.startswith("https://"):
@@ -35,7 +39,7 @@ def download(directory, name, url, expected):
             size = 0
             while data := source.read(1024 * 1024):
                 size += len(data)
-                if size > 500_000_000:
+                if size > 500_000_000 or time.monotonic() > deadline:
                     raise StartupError("ACQUISITION_FAILED")
                 out.write(data)
         temporary.chmod(0o600)

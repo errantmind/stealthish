@@ -1,4 +1,5 @@
 """Foreground preparation, activation, and profile-safe recovery. No updater service."""
+from contextlib import nullcontext
 from dataclasses import asdict, replace
 from datetime import datetime, timezone
 from importlib import metadata
@@ -6,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
 import sys
 import sysconfig
@@ -103,10 +105,10 @@ def environment(release):
     return site
 
 
-def prepare(data_dir: Path, name: str):
+def prepare(data_dir: Path, name: str, *, _lock=None):
     require_linux()
     root = data_dir.expanduser().resolve()
-    with ProfileLock(root):
+    with (nullcontext(_lock) if _lock else ProfileLock(root)):
         if (root / MARKER).exists():
             raise StartupError("MAINTENANCE_REQUIRED")
         target = release_path(root, name)
@@ -267,31 +269,35 @@ async def verify_child(root, name, fd, initialize):
 
 def launcher(root):
     # The launcher selects an immutable release environment. It has no browser logic.
-    data = '''#!/usr/bin/env python3
-import os
+    data = '''import os
 from pathlib import Path
 import re
 import sys
 import tomllib
-root = Path(__file__).resolve().parent
+root = Path(sys.argv[1]).resolve()
 try:
     name = tomllib.loads((root / "config.toml").read_text())["release"]
     if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,79}", name):
         raise ValueError()
     python = root / "releases" / name / "env/bin/python"
-    args = sys.argv[1:] or ["status"]
+    args = sys.argv[2:] or ["status"]
     os.execv(python, [str(python), "-I", "-B", "-m", "stealthish", *args, "--data-dir", str(root)])
 except (OSError, KeyError, ValueError):
     sys.exit("No usable selected release. Use explicit setup or recovery.")
 '''
-    write_file(root / "stealthish", data.encode())
+    # Use the fixed base interpreter, including managed Python. No system
+    # Python or shell PATH change is required. Quote paths with spaces safely.
+    python = str(Path(sys._base_executable).resolve())
+    script = "#!/bin/sh\nexec " + shlex.quote(python) + " -I -B -c " + shlex.quote(data)
+    script += " " + shlex.quote(str(root)) + ' "$@"\n'
+    write_file(root / "stealthish", script.encode())
     (root / "stealthish").chmod(0o700)
 
 
-def activate(data_dir: Path, name: str):
+def activate(data_dir: Path, name: str, *, _lock=None, _automatic=None):
     require_linux()
     root = data_dir.expanduser().resolve()
-    with ProfileLock(root) as lock:
+    with (nullcontext(_lock) if _lock else ProfileLock(root)) as lock:
         if (root / MARKER).exists():
             raise StartupError("MAINTENANCE_REQUIRED")
         target = release_path(root, name)
@@ -312,6 +318,8 @@ def activate(data_dir: Path, name: str):
             raise StartupError("INVALID_CONFIG")
         record = backup(root)
         record.update({"candidate": name, "previous": old.release if old else None})
+        if _automatic:
+            record["automaticSetup"] = _automatic
         write_json(root / MARKER, record)
         blocker = root / "blocker"
         if blocker.exists():
@@ -332,12 +340,12 @@ def activate(data_dir: Path, name: str):
             "next": "Use real browsing tasks. Startup did not prove account or live-site acceptance."}
 
 
-def recover(data_dir: Path, *, accept_data_loss=False):
+def recover(data_dir: Path, *, accept_data_loss=False, _lock=None):
     require_linux()
     if not accept_data_loss:
         raise StartupError("RECOVERY_CONFIRMATION_REQUIRED")
     root = data_dir.expanduser().resolve()
-    with ProfileLock(root) as lock:
+    with (nullcontext(_lock) if _lock else ProfileLock(root)) as lock:
         pending = root / MARKER
         record_path = pending if pending.exists() else root / "state/previous.json"
         if not record_path.exists():

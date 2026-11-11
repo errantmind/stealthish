@@ -390,10 +390,11 @@ def outer(mode, order):
         (run / 'invocation.json').write_text(json.dumps({
             'namespaces': {x: namespace(x) for x in ('net', 'pid', 'mnt', 'user')},
             'canary': canary.port, 'mode': mode, 'order': order, 'wheelSHA256': sha(WHEEL),
+            'installedEnvironment': str(ENV),
             'sourceHashes': hashes, 'packagingHashes': {n: sha(ROOT / n) for n in ('pyproject.toml', 'uv.lock')},
         }, indent=2) + '\n')
         command = sandbox_command(ROOT, run, [])
-        command = command[:command.index('--') + 1] + [str(ENV / 'bin/python'), '-I', '-B', str(Path(__file__).resolve()), '--child', str(run)]
+        command = command[:command.index('--') + 1] + [str(ENV / 'bin/python'), '-I', '-B', str(Path(__file__).resolve()), '--child', str(run), '--environment', str(ENV)]
         code = 1
         with (run / 'stdout.log').open('w') as out, (run / 'stderr.log').open('w') as err:
             try:
@@ -410,7 +411,12 @@ def outer(mode, order):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--child', type=Path)
+    parser.add_argument('--environment', type=Path, help='Installed environment under this project .runtime; never a production profile.')
     parser.add_argument('--mode', choices=('product', 'stock-control'), default='product')
     parser.add_argument('--order', choices=('natural', 'preloaded'), default='natural')
     args = parser.parse_args()
+    if args.environment:
+        ENV = args.environment.resolve()
+        if not ENV.is_relative_to(ROOT / '.runtime') or not (ENV / 'bin/python').is_file():
+            raise ValueError('Use an installed environment under .runtime.')
     raise SystemExit(child(args.child) if args.child else outer(args.mode, args.order))
