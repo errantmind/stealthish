@@ -2,11 +2,11 @@
 
 A standalone browser CLI and async Python API for local AI workflows. Headless by default, persistent profiles, careful native input, and gorhill blocking. The Pi extension uses private pipes and its existing ownership queue, not a shared browser service.
 
-**Current source: `0.1.0.dev6`. Automatic Linux setup is implemented and checked locally. Public release assets are not uploaded yet.** See [publishing](docs/publishing.md) before distributing the new extension pin or reloading the normal installed instance.
+**Current release: [v0.1.0.dev6](https://github.com/errantmind/stealthish/releases/tag/v0.1.0.dev6), a Linux prerelease.** Automatic setup is checked locally, and anonymous downloads of the published assets match their pinned hashes. A complete fresh installation using those public assets remains to be checked. See [publishing](docs/publishing.md).
 
 ## Automatic Pi setup
 
-Once the pinned release assets are published, the first browser request installs any missing components and continues the request:
+The extension pins the published release. Its first browser request installs any missing components and continues the request:
 
 ```text
 Official pinned uv installer, if needed
