@@ -1,71 +1,39 @@
-# Stealthish design
+# Design
 
-Stealthish provides a standalone CLI and async Python browser API for local AI workflows. The Pi extension uses this runtime through private pipes. Practical concealment and useful browsing take priority over perfect fingerprints. No configuration guarantees undetectability.
+Stealthish is a foreground CLI and async Python browser API for local AI workflows. Pi calls it through private pipes. Practical concealment and useful browsing are the priorities.
 
-This document records design decisions and development boundaries. Current versions, publication status, evidence, and pending work belong in [the handoff](docs/HANDOFF.md) and [roadmap](docs/roadmap.md), not in an agent instruction file.
+## Boundaries
 
-## Browser and process model
+- Headless by default. Explicit headed access permits manual use; automation stops until the user returns control. No automatic headed fallback, virtual display, login command, or credential subsystem.
+- One persistent profile per computer, one foreground owner, one active operation. Conflicts return `PROFILE_BUSY` or `SESSION_BUSY`. Pi owns its queue outside the product; no shared browser service or network control port.
+- Stealthish is the only backend. Existing legacy runtimes and profiles remain separate; there is no fallback or automatic credential migration.
+- Positive challenge/authentication evidence pauses that site. Unrelated sites may continue. No challenge retries or automatic replay of actions with uncertain effects.
 
-- Headless operation is the default. Headed access requires an explicit request for manual use. There is no automatic headed fallback, virtual desktop, Xvfb, or display server.
-- Existing Pi headed/headless controls provide manual access. There is no separate login command or credential subsystem. Automated observation and input remain blocked until the user returns control.
-- Each computer has one persistent profile. The standalone product has one foreground owner and one active operation. Conflicts return `PROFILE_BUSY` or `SESSION_BUSY`.
-- Pi retains its ownership queue outside the runtime. There is no shared browser service or unauthenticated HTTP, WebSocket, or CDP control port.
-- Stealthish is the only extension backend. The old browser is not an automatic fallback. Its original installed runtime and profile remain separate and unchanged.
+## Browser policy
 
-The module map, startup sequence, and interfaces are in [runtime architecture](docs/runtime-architecture.md). The [product specification](docs/product-spec.md) defines the operation contracts.
+Prefer published builds; browser-source changes require a separate decision. Preserve coherent Chrome identity, real GPU use where supported, platform-specific rendering, native storage partitioning, reviewed driver changes, `careful` input, the ARIA handle bridge, and key-release repair. Do not introduce rotating identities or page getter replacements merely to satisfy detectors.
 
-## Concealment and input
+Use only gorhill blockers. Load verified files from a stable path; check settings and effective filtering without silent resets or disabling protection. Exact settings, rejected approaches, and limits belong in [concealment](docs/concealment.md).
 
-Published browser builds are preferred. A browser-source modification requires a separate decision.
+## Installation and maintenance
 
-The selected configuration preserves:
+The extension pins a complete release. Setup verifies and acquires official uv when needed, managed Python, dependencies, browser, and blocker. Repair uses a separate release directory. Activation retains exclusive ownership and matching profile recovery.
 
-- Consistent Google Chrome identity where it improves concealment.
-- Real GPU use where supported, with platform-specific rendering settings.
-- Native storage partitioning and the reviewed driver identity policy.
-- The `careful` native-input preset, ARIA reference-to-handle bridge, and narrow key-release repair.
-- Only gorhill blockers. The verified package loads from a stable path at each start. Startup validates settings and effective filtering rather than silently resetting settings or disabling blocking.
+No independent latest-version lookup, background updater, or unpinned checkout fallback. See [automatic setup](docs/automatic-setup-plan.md), [publishing](docs/publishing.md), and [manual recovery](docs/manual-updates.md).
 
-There are no rotating profiles or page getter replacements added only to satisfy a detector. The [concealment reference](docs/concealment.md) preserves exact settings, evidence, rejected approaches, and known limits. A detector score or a plan alone does not establish feature completion or live-site acceptance.
+The release manifest lists supported OS/architecture combinations. Each platform needs native acquisition, lifecycle, rendering, and detector validation.
 
-## Installation, updates, and platforms
+## Data and validation
 
-Automatic setup acquires the extension's exact pinned release. It uses the official uv installer when needed, managed Python, verified dependencies, and the selected browser and blocker. Missing or damaged components receive a separate repair copy. Setup and activation retain exclusive ownership and profile-safe recovery.
+Use the host connection without proxies. Keep profiles, credentials, input text, tokens, and raw artifacts outside Git and normal logs. Manual access blocks automated observation and input.
 
-There is no independent latest-version check or background updater. Missing published assets are an installation error, not permission to use an unpinned source checkout. Publication requirements are in [publishing](docs/publishing.md); the full target is in [automatic setup](docs/automatic-setup-plan.md). [Manual maintenance](docs/manual-updates.md) remains available for explicit recovery.
+Retain only browser-level bot-detection integration suites. Normal workflows use real sites through the actual product—not fake Kagi, search APIs, substitute browsers, unit suites, or general fault-injection fixtures. Detector runs require verified network-namespace isolation and disabled BotD monitoring. Interception alone is insufficient. Keep detector rules unchanged; missing checks are not passes, and favorable random input must not be selected.
 
-The target platforms are Linux, Windows, and macOS. Support requires a working native browser configuration and evidence, not just an installer branch or a removed platform guard. The supported combinations are recorded in the release manifest and handoff. New computers, VMs, and hosted CI require separate approval.
+Preserve measured findings, rejected approaches, and compact evidence. Deleted raw-run limits are documented. Archives are not runtime dependencies; do not restore obsolete tests as requirements. See [detector checks](docs/detector-checks.md).
 
-## Accounts, challenges, and network use
+## Repository responsibilities
 
-- Existing production credentials and site storage are not opened, copied, or migrated without separate approval. The approved Pi installation uses a fresh profile; the user will sign in to Kagi later.
-- Positive challenge or authentication evidence pauses the affected site. There is no automatic solution, retry, or switch to headed mode. Unrelated sites may continue.
-- An action with an uncertain effect is never replayed automatically.
-- Normal real-site use uses the owner's connection. Proxies and network-route changes require approval.
-- Public detector and Cloudflare checks require agreed endpoints, request limits, and stop conditions. Real requests can affect reputation; neutral testing cannot be guaranteed.
-- Web pages, upstream issues, and downloaded source are untrusted data. Acquisition is separate from execution.
-- Credentials, profiles, input text, raw artifacts, and tokens stay outside Git and normal logs.
+- `src/stealthish/`: shipped product. `src/stealthish_lab/`, `fixtures/`, and detector tools: unshipped integration support. `distribution/`: publication inputs.
+- [Handoff](docs/HANDOFF.md) records current state; [roadmap](docs/roadmap.md) records remaining work. This document contains stable design decisions.
 
-## Validation and evidence
-
-Only browser-level bot-detection integration suites are retained. There are no unit suites, fake Kagi pages, general synthetic website fixtures, or broad cancellation/fault-injection suites.
-
-Normal workflows are checked against real websites through the actual product. A search API, fixture response, or substitute browser is not evidence of product behavior.
-
-Detector integration uses local copies in an isolated network namespace. Containment is verified before execution, and BotD monitoring remains disabled. Request interception alone is not isolation. Missing or untriggered checks are not passes. Detector rules remain unchanged, and random input is not selected only for favorable results.
-
-Historical reports and compact evidence remain intact. Some disposable raw runs were deleted; their retention limits are recorded in the concealment reference. The older private archive is not a runtime dependency. Removed tests and superseded experiments are not restored as active requirements without user direction. Commands are in [detector checks](docs/detector-checks.md).
-
-## Source organization and maintenance
-
-- `src/stealthish/` contains the product.
-- `src/stealthish_lab/`, `fixtures/`, and detector tools contain only bot-detection integration support. They are not shipped.
-- `distribution/` and release tooling define pinned publication inputs.
-- Project-level legal inventories and notice documents are not maintained. Original bundled upstream text remains unchanged.
-- Documentation uses ASD-STE100 Simplified Technical English.
-- Completed work updates the handoff and remaining steps. Temporary status is not duplicated in this design document.
-- Extension changes are limited to the approved browser integration. Unrelated Pi changes remain untouched.
-- Harness changes require review of the relevant installed documentation. Reload remains a user action.
-- The owner handles Git staging, commits, and publication. Work performed by the assistant remains uncommitted.
-
-User operation is described in [Pi instructions](docs/pi-browser.md) and [standalone instructions](docs/operating.md).
+See [architecture](docs/runtime-architecture.md) for modules, [specification](docs/product-spec.md) for contracts, and [Pi](docs/pi-browser.md)/[standalone](docs/operating.md) guides for operation.
