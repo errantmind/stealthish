@@ -1,4 +1,4 @@
-"""Acquire a pinned official gorhill artifact. Do not execute its code."""
+"""Acquire a pinned official uBlock Origin Lite artifact without executing it."""
 import hashlib
 import json
 from pathlib import Path

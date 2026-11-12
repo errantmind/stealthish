@@ -13,7 +13,7 @@ Stealthish is a foreground CLI and async Python browser API for local AI workflo
 
 Prefer published builds; browser-source changes require a separate decision. Preserve coherent Chrome identity, real GPU use where supported, platform-specific rendering, native storage partitioning, reviewed driver changes, `careful` input, the ARIA handle bridge, and key-release repair. Do not introduce rotating identities or page getter replacements merely to satisfy detectors.
 
-Use only gorhill blockers. Load verified files from a stable path; check settings and effective filtering without silent resets or disabling protection. Exact settings, rejected approaches, and limits belong in [concealment](docs/concealment.md).
+Use uBlock Origin or uBlock Origin Lite; the current release uses Lite. Load verified files from a stable path; check settings and effective filtering without silent resets or disabling protection. Exact settings, rejected approaches, and limits belong in [concealment](docs/concealment.md).
 
 ## Installation and maintenance
 

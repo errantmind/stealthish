@@ -1,10 +1,10 @@
 # Stealthish
 
-A foreground browser CLI and async Python API for local AI workflows: headless by default, persistent sign-ins, careful native input, and gorhill blocking. Pi uses private pipes and its existing ownership queue—not a shared browser service.
+A foreground browser CLI and async Python API for local AI workflows: headless by default, persistent sign-ins, careful native input, and uBlock Origin Lite. Pi uses private pipes and its existing ownership queue—not a shared browser service.
 
 ## Install and use
 
-The Pi extension automatically acquires its pinned release on first use: official uv when needed, managed Python, locked wheels, private Chrome, and gorhill. No separate clone, system Python, PATH edit, or setup command is required. Later starts verify and reuse files; updates follow the extension pin, with profile backup and side-by-side repair. No legacy fallback or independent latest-version updater.
+The Pi extension automatically acquires its pinned release on first use: official uv when needed, managed Python, locked wheels, private Chrome, and uBlock Origin Lite. No separate clone, system Python, PATH edit, or setup command is required. Later starts verify and reuse files; updates follow the extension pin, with profile backup and side-by-side repair. No legacy fallback or independent latest-version updater.
 
 [v0.1.0.dev6](https://github.com/errantmind/stealthish/releases/tag/v0.1.0.dev6) is a **Linux x86-64 prerelease** requiring glibc 2.31+, native browser libraries, and working Vulkan GPU support. It was measured on NVIDIA. Windows/macOS browser support is unfinished.
 

@@ -1,4 +1,4 @@
-"""Load only the selected gorhill files. Startup validates rather than resets settings."""
+"""Load selected uBlock Origin Lite files. Validate settings without resetting them."""
 import asyncio
 import json
 

@@ -1,4 +1,4 @@
-"""Explicit acquisition of the selected published Linux browser and gorhill package."""
+"""Acquire the selected published Linux browser and uBlock Origin Lite package."""
 import io
 import json
 from pathlib import Path
