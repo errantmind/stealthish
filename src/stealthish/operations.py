@@ -1,7 +1,6 @@
 """Browser operations shared by both interfaces. No raw JavaScript operation."""
 import asyncio
 import secrets
-from urllib.parse import urlsplit
 
 from .artifacts import requested, save_text
 from .errors import StealthishError
@@ -9,6 +8,7 @@ from .extraction import readable, raw_html
 from . import search, tabs
 from .protocol import CAPABILITIES, Request, Result, http_url
 from .references import redact_fields
+from .verification import inspect
 
 
 def limit(config, params):
@@ -36,28 +36,6 @@ def navigation_options(config, params):
             type(timeout) not in {int, float} or not 1 <= timeout <= 600000:
         raise StealthishError("INVALID_REQUEST")
     return {"wait_until": wait, "timeout": timeout}
-
-
-async def challenge(page):
-    # Kagi can redirect before its challenge iframe is inserted into the DOM.
-    location = urlsplit(page.url)
-    if location.hostname == "kagi.com":
-        route = location.path.rstrip("/")
-        if route == "/turnstile":
-            return "CHALLENGE_REQUIRED"
-        if route in {"/signin", "/login"}:
-            return "AUTH_REQUIRED"
-    for selector in ('iframe[src*="recaptcha"][title*="challenge" i]',
-                     'iframe[src*="challenges.cloudflare.com"]', '#challenge-running', '#challenge-stage'):
-        loc = page.locator(selector).first
-        if await loc.count() and await loc.is_visible():
-            return "CHALLENGE_REQUIRED"
-    password = page.locator('input[type="password"]').first
-    if await password.count() and await password.is_visible():
-        if await page.get_by_role("button", name="sign in", exact=False).count() or \
-                await page.get_by_role("button", name="log in", exact=False).count():
-            return "AUTH_REQUIRED"
-    return None
 
 
 async def execute(session, request):
@@ -106,22 +84,19 @@ async def execute(session, request):
             target.setdefault("tabPolicy", "reuse-domain")
         navigated = await execute(session, Request(request.id, "navigate", target))
         tab, page = session.page({"tabId": navigated.data["tabId"]})
-        try:
+        data, result.truncation, result.warnings, full = await search.collect(page, length, engine)
+        if data["kind"] == "fallback":
+            info = search.engine_info(engine)
+            try:
+                await page.locator(info["containers"]).first.wait_for(
+                    state="visible", timeout=min(params.get("timeoutMs", 15000), 15000))
+            except Exception:
+                pass
+            await session.check_pause(tab, page, url)
             data, result.truncation, result.warnings, full = await search.collect(page, length, engine)
-            if data["kind"] == "fallback":
-                info = search.engine_info(engine)
-                try:
-                    await page.locator(info["containers"]).first.wait_for(
-                        state="visible", timeout=min(params.get("timeoutMs", 15000), 15000))
-                except Exception:
-                    pass
-                await session.check_pause(tab, page, url)
-                data, result.truncation, result.warnings, full = await search.collect(page, length, engine)
-        except StealthishError as error:
-            if error.code in {"CHALLENGE_REQUIRED", "AUTH_REQUIRED", "CONSENT_REQUIRED"}:
-                session.pause(tab, error.code, url)
-            raise
-        await session.check_pause(tab, page, url)
+        while await session.check_pause(tab, page, url):
+            # Re-read after an automatic redirect; never resubmit the search.
+            data, result.truncation, result.warnings, full = await search.collect(page, length, engine)
         result.data = {**await tabs.context(session, tab), "engine": engine, "url": page.url, **data}
         if requested(params, "saveOnTruncation") and result.truncation["truncated"]:
             result.data["artifact"] = save_text(config, full, "txt")
@@ -163,8 +138,8 @@ async def execute(session, request):
         if action != "goto" and (policy != "current" or "url" in params):
             raise StealthishError("INVALID_REQUEST")
         options = navigation_options(config, params)
-        if url and urlsplit(url).hostname in session.paused_sites:
-            raise StealthishError("CHALLENGE_REQUIRED")
+        if url:
+            session.check_site_pause(url)
         tab, page = await tabs.choose(session, url, policy, params.get("tabId"))
         await session.check_pause(tab, page)
         session.refs.invalidate(tab)
@@ -178,6 +153,7 @@ async def execute(session, request):
         else:
             await page.go_forward(**{**options, "wait_until": params.get("waitUntil", "commit")})
         session.selected = tab
+        session.effect = "applied"
         await session.check_pause(tab, page, url)
         result.data = {**await tabs.context(session, tab), "url": page.url}
         result.effect = "applied"
@@ -187,10 +163,16 @@ async def execute(session, request):
     if op == "resume":
         if params.get("confirmed") is not True:
             raise StealthishError("INVALID_REQUEST")
-        reason = await challenge(page)
-        if reason:
-            raise StealthishError(reason)
+        state = await inspect(page)
+        if state["signal"]:
+            signal = state["signal"]
+            raise session.verification.error(tab, page, signal,
+                                             "still-present" if signal.automatic else "human-required")
+        if not state["ready"]:
+            raise StealthishError("CHALLENGE_REQUIRED")
         session.paused.pop(tab, None)
+        session.pause_errors.pop(tab, None)
+        session.verification.forget(tab)
         site = session.pause_origins.pop(tab, None)
         if site and site not in session.pause_origins.values():
             session.paused_sites.discard(site)
@@ -200,7 +182,8 @@ async def execute(session, request):
         length = limit(config, params)
         boxes = requested(params, "boxes")
         text = await page.aria_snapshot(mode="ai", boxes=boxes)
-        await session.check_pause(tab, page)
+        while await session.check_pause(tab, page):
+            text = await page.aria_snapshot(mode="ai", boxes=boxes)
         text = session.refs.snapshot(tab, redact_fields(text))
         result.data = {"text": clipped(result, text, length)}
         if save_requested(params, result.truncation["truncated"]):
@@ -210,7 +193,9 @@ async def execute(session, request):
         html_requested = requested(params, "includeHtml")
         text, method, result.warnings = await readable(page)
         html = await raw_html(page) if html_requested else None
-        await session.check_pause(tab, page)
+        while await session.check_pause(tab, page):
+            text, method, result.warnings = await readable(page)
+            html = await raw_html(page) if html_requested else None
         result.data = {"method": method, "text": clipped(result, text, length)}
         if save_requested(params, result.truncation["truncated"]):
             result.data["artifact"] = save_text(config, text, "txt")

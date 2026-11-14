@@ -22,10 +22,6 @@ NO_RESULTS = {
 COLLECT = r"""({engine, empty}) => {
     const visible=e => !!e && getComputedStyle(e).visibility!=='hidden' && e.getClientRects().length>0;
     const has=s => [...document.querySelectorAll(s)].some(visible);
-    if (has('#captcha-form, #challenge-form, .g-recaptcha, .anomaly-modal, #cf-challenge-running'))
-        return {interstitial:'CHALLENGE_REQUIRED'};
-    if (has("form[action*='consent']")) return {interstitial:'CONSENT_REQUIRED'};
-    if (has("form input[type='password']")) return {interstitial:'AUTH_REQUIRED'};
     const nodes=[...document.querySelectorAll(engine.containers)];
     const results=[]; let sourceTruncated=nodes.length>100;
     for (const node of nodes.slice(0,100)) {
@@ -44,8 +40,6 @@ COLLECT = r"""({engine, empty}) => {
     }
     const main=document.querySelector('main,#search-results') || document.body;
     const text=main ? main.innerText.slice(0,100000).toLowerCase() : '';
-    if (text.includes('our systems have detected unusual traffic') || text.includes('verify you are human to continue'))
-        return {interstitial:'CHALLENGE_REQUIRED'};
     const noResults=empty.some(phrase=>text.includes(phrase)) && !has('h2 a[href], h3 a[href], a:has(h2), a:has(h3)');
     return {results,noResults,sourceTruncated};
 }"""
@@ -124,14 +118,8 @@ async def collect(page, budget, engine="kagi"):
     info = engine_info(engine)
     location = urlsplit(page.url)
     host = location.hostname or ""
-    if host.startswith("consent."):
-        raise StealthishError("CONSENT_REQUIRED")
-    if location.path.startswith(("/sorry/", "/captcha")):
-        raise StealthishError("CHALLENGE_REQUIRED")
     if host == info["domain"] or host.endswith("." + info["domain"]):
         state = await page.evaluate(COLLECT, {"engine": info, "empty": NO_RESULTS[engine]})
-        if state.get("interstitial"):
-            raise StealthishError(state["interstitial"])
         results, full, truncation = bounded_results(state, budget, engine, page.url)
         if truncation["observedResults"]:
             return {"kind": "results", "results": results, "text": full[:budget], "method": engine+"-dom"}, truncation, [], full

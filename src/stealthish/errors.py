@@ -25,7 +25,7 @@ MESSAGES = {
     "TAB_LIMIT": "The session tab limit was reached.",
     "UNSUPPORTED": "This operation is not supported in this build.",
     "CONTENT_LIMIT": "The document exceeds the supported extraction limit. No partial article was returned.",
-    "CHALLENGE_REQUIRED": "The site requires human review. No retry was made.",
+    "CHALLENGE_REQUIRED": "Site verification is incomplete. The site is paused. No retry was made.",
     "AUTH_REQUIRED": "The site requires authentication. No further input was sent.",
     "CONSENT_REQUIRED": "The site requires user consent. No consent was submitted.",
     "MANUAL_ACCESS": "The browser is held for manual use. Return control with headless mode before automation.",
@@ -33,9 +33,10 @@ MESSAGES = {
 
 
 class StealthishError(Exception):
-    def __init__(self, code: str):
+    def __init__(self, code: str, *, message: str | None = None, data: dict | None = None):
         self.code = code
-        super().__init__(MESSAGES.get(code, "The operation failed."))
+        self.data = data or {}
+        super().__init__(message or MESSAGES.get(code, "The operation failed."))
 
 
 class StartupError(StealthishError):

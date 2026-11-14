@@ -11,11 +11,12 @@ from .config import SessionConfig
 from .errors import StartupError, StealthishError
 from .input import Input
 from .localcheck import NATIVE, check_filtering, local_check_server
-from .operations import challenge, execute
+from .operations import execute
 from .ownership import ProfileLock, private_directory
 from .protocol import Request, Result
 from .references import References
 from .release import BROWSER_VERSION, load_release
+from .verification import Verification
 
 
 class BrowserSession:
@@ -35,7 +36,9 @@ class BrowserSession:
         self.closed_tabs = []
         self.selected = None
         self.paused, self.pause_origins = {}, {}
+        self.pause_errors = {}
         self.paused_sites = set()
+        self.verification = Verification()
         self.refs = References()
         self.input = Input()
         self.effect = "none"
@@ -128,6 +131,8 @@ class BrowserSession:
             self.paused.clear()
             self.pause_origins.clear()
             self.paused_sites.clear()
+            self.pause_errors.clear()
+            self.verification = Verification()
             await self._start_browser()
         except BaseException:
             # No partial session is offered after failed or cancelled restart.
@@ -153,6 +158,7 @@ class BrowserSession:
         self.touch(tab)
         if self.config.headless:
             self.input.attach(page)
+            page.on("response", lambda response: self.verification.response(tab, page, response))
         page.on("framenavigated", lambda _: self.refs.invalidate(tab))
         page.on("close", lambda: self._page_closed(tab))
         if self.selected is None:
@@ -163,6 +169,8 @@ class BrowserSession:
         self.access.pop(tab, None)
         self.refs.invalidate(tab)
         self.paused.pop(tab, None)
+        self.pause_errors.pop(tab, None)
+        self.verification.forget(tab)
         site = self.pause_origins.pop(tab, None)
         if site and site not in self.pause_origins.values():
             self.paused_sites.discard(site)
@@ -204,23 +212,35 @@ class BrowserSession:
         self.touch(tab)
         return tab, self.pages[tab]
 
-    def pause(self, tab, code, url):
+    def pause(self, tab, code, url, error=None):
         self.paused[tab] = code
+        self.pause_errors[tab] = error or StealthishError(code)
         site = urlsplit(url).hostname
         self.pause_origins[tab] = site
         if site:
             self.paused_sites.add(site)
         self.refs.invalidate(tab)
 
+    def check_site_pause(self, url):
+        site = urlsplit(url).hostname
+        if site in self.paused_sites:
+            tab = next(key for key, value in self.pause_origins.items() if value == site)
+            raise self.pause_errors[tab]
+
     async def check_pause(self, tab, page, initiating_url=None):
         if tab in self.paused:
-            raise StealthishError(self.paused[tab])
-        if urlsplit(page.url).hostname in self.paused_sites:
-            raise StealthishError("CHALLENGE_REQUIRED")
-        reason = await challenge(page)
-        if reason:
-            self.pause(tab, reason, initiating_url or page.url)
-            raise StealthishError(reason)
+            raise self.pause_errors[tab]
+        self.check_site_pause(page.url)
+        try:
+            return await self.verification.check(tab, page, initiating_url)
+        except StealthishError as error:
+            self.pause(tab, error.code, initiating_url or page.url, error)
+            raise
+        except BaseException:
+            error = self.verification.interrupted(tab)
+            if error:
+                self.pause(tab, error.code, initiating_url or page.url, error)
+            raise
 
     async def execute(self, request: Request | dict) -> Result:
         if not isinstance(request, Request):
@@ -239,6 +259,9 @@ class BrowserSession:
                 if type(value) not in {int, float} or not 1 <= value <= 600000:
                     raise StealthishError("INVALID_REQUEST")
                 timeout = max(timeout, value / 1000 + 20)
+            self.verification.begin(asyncio.get_running_loop().time() + timeout,
+                                    request.params.get("engine", self.config.search_engine)
+                                    if request.operation == "search" else None)
             async with asyncio.timeout(timeout):
                 result = await execute(self, request)
             if self.closed_tabs:
@@ -251,7 +274,7 @@ class BrowserSession:
         except StealthishError as error:
             paused = error.code in {"CHALLENGE_REQUIRED", "AUTH_REQUIRED", "CONSENT_REQUIRED", "MANUAL_ACCESS"}
             result = Result(request.id, status="paused" if paused else "error", code=error.code,
-                            effect=self.effect, data={"message": str(error)})
+                            effect=self.effect, data={"message": str(error), **error.data})
         except TimeoutError:
             result = Result(request.id, status="error", code="TIMEOUT", effect=self.effect)
         except Exception as error:
@@ -260,6 +283,9 @@ class BrowserSession:
             result = Result(request.id, status="error", code=code, effect=self.effect)
         finally:
             self._busy = None
+        observations = [self.verification.details(tab) for tab in self.verification.attempts]
+        if observations and "verification" not in result.data:
+            result.data["verification"] = observations[-1]
         if request.operation == "close":
             await self.close()
         return result
@@ -296,6 +322,8 @@ class BrowserSession:
             self.paused.clear()
             self.pause_origins.clear()
             self.paused_sites.clear()
+            self.pause_errors.clear()
+            self.verification = Verification()
             self.refs = References()
             self._lock.close()
             self._closing = False

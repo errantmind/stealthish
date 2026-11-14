@@ -7,7 +7,7 @@ Stealthish is a foreground CLI and async Python browser API for local AI workflo
 - Headless by default. Explicit headed access permits manual use; automation stops until the user returns control. No automatic headed fallback, virtual display, login command, or credential subsystem.
 - One persistent profile per computer, one foreground owner, one active operation. Conflicts return `PROFILE_BUSY` or `SESSION_BUSY`. Pi owns its queue outside the product; no shared browser service or network control port.
 - Stealthish is the only backend. Existing legacy runtimes and profiles remain separate; there is no fallback or automatic credential migration.
-- Positive challenge/authentication evidence pauses that site. Unrelated sites may continue. No challenge retries or automatic replay of actions with uncertain effects.
+- Automatic verification permits one passive wait of up to 10 seconds within the operation deadline. Persistent checks, required interaction, and authentication pause that site. Unrelated sites may continue. No challenge retries or automatic replay of actions with uncertain effects.
 
 ## Browser policy
 
