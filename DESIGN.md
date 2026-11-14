@@ -1,6 +1,6 @@
 # Design
 
-Stealthish is a foreground CLI and async Python browser API for local AI workflows. Pi calls it through private pipes. Practical concealment and useful browsing are the priorities.
+Stealthish is a foreground CLI and async Python browser API for local AI workflows. Pi calls it through private pipes. Practical concealment and useful browsing are the priorities. References under `docs/` are local records, excluded from Git.
 
 ## Boundaries
 
@@ -13,13 +13,13 @@ Stealthish is a foreground CLI and async Python browser API for local AI workflo
 
 Prefer published builds; browser-source changes require a separate decision. Preserve coherent Chrome identity, real GPU use where supported, platform-specific rendering, native storage partitioning, reviewed driver changes, `careful` input, the ARIA handle bridge, and key-release repair. Do not introduce rotating identities or page getter replacements merely to satisfy detectors.
 
-Use uBlock Origin or uBlock Origin Lite; the current release uses Lite. Load verified files from a stable path; check settings and effective filtering without silent resets or disabling protection. Exact settings, rejected approaches, and limits belong in [concealment](docs/concealment.md).
+Use uBlock Origin or uBlock Origin Lite; the current release uses Lite. Load verified files from a stable path; check settings and effective filtering without silent resets or disabling protection. Exact settings, rejected approaches, and limits belong in `docs/concealment.md`.
 
 ## Installation and maintenance
 
-The extension pins a complete release. Setup verifies and acquires official uv when needed, managed Python, dependencies, browser, and blocker. Repair uses a separate release directory. Activation retains exclusive ownership and matching profile recovery.
+At backend startup, the extension discovers the most recently published Stealthish release, including prereleases, and verifies the manifest and wheel against GitHub's asset digests. That manifest pins the complete component set. Setup acquires official uv when needed, managed Python, dependencies, browser, and blocker. Repair uses a separate release directory. Activation retains exclusive ownership and matching profile recovery.
 
-No independent latest-version lookup, background updater, or unpinned checkout fallback. See [automatic setup](docs/automatic-setup-plan.md), [publishing](docs/publishing.md), and [manual recovery](docs/manual-updates.md).
+Running sessions retain their release until restart. Components have no independent latest-version lookup; there is no background updater or checkout fallback. Release discovery and setup failures stop startup without silently selecting an older release. See `docs/automatic-setup-plan.md`, `docs/publishing.md`, and `docs/manual-updates.md`.
 
 The release manifest lists supported OS/architecture combinations. Each platform needs native acquisition, lifecycle, rendering, and detector validation.
 
@@ -29,11 +29,11 @@ Use the host connection without proxies. Keep profiles, credentials, input text,
 
 Retain only browser-level bot-detection integration suites. Normal workflows use real sites through the actual product—not fake Kagi, search APIs, substitute browsers, unit suites, or general fault-injection fixtures. Detector runs require verified network-namespace isolation and disabled BotD monitoring. Interception alone is insufficient. Keep detector rules unchanged; missing checks are not passes, and favorable random input must not be selected.
 
-Preserve measured findings, rejected approaches, and compact evidence. Deleted raw-run limits are documented. Archives are not runtime dependencies; do not restore obsolete tests as requirements. See [detector checks](docs/detector-checks.md).
+Preserve measured findings, rejected approaches, and compact evidence. Deleted raw-run limits are documented. Archives are not runtime dependencies; do not restore obsolete tests as requirements. See `docs/detector-checks.md`.
 
 ## Repository responsibilities
 
 - `src/stealthish/`: shipped product. `src/stealthish_lab/`, `fixtures/`, and detector tools: unshipped integration support. `distribution/`: publication inputs.
-- [Handoff](docs/HANDOFF.md) records current state; [roadmap](docs/roadmap.md) records remaining work. This document contains stable design decisions.
+- `docs/HANDOFF.md` records current state; `docs/roadmap.md` records remaining work. This document contains stable design decisions.
 
-See [architecture](docs/runtime-architecture.md) for modules, [specification](docs/product-spec.md) for contracts, and [Pi](docs/pi-browser.md)/[standalone](docs/operating.md) guides for operation.
+Local references: `docs/runtime-architecture.md` for modules, `docs/product-spec.md` for contracts, and `docs/pi-browser.md` / `docs/operating.md` for operation.

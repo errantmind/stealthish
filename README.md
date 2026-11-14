@@ -4,22 +4,24 @@ A foreground browser CLI and async Python API for local AI workflows: headless b
 
 ## Install and use
 
-The Pi extension automatically acquires its pinned release on first use: official uv when needed, managed Python, locked wheels, private Chrome, and uBlock Origin Lite. No separate clone, system Python, PATH edit, or setup command is required. Later starts verify and reuse files; updates follow the extension pin, with profile backup and side-by-side repair. No legacy fallback or independent latest-version updater.
+At each backend startup, the Pi extension discovers the most recently published Stealthish release, including prereleases. It verifies the manifest and wheel against GitHub's asset digests, then acquires or reuses that release's pinned uv, managed Python, dependencies, private Chrome, and uBlock Origin Lite. No version pin in Pi, separate clone, system Python, PATH edit, or setup command is required. Updates preserve profile backups and side-by-side repair. Running sessions keep their release until restart. Lookup or setup failures are reported without selecting an older release.
 
-[v0.1.0.dev7](https://github.com/errantmind/stealthish/releases/tag/v0.1.0.dev7) is a **Linux x86-64 prerelease** requiring glibc 2.31+, native browser libraries, and working Vulkan GPU support. It was measured on NVIDIA. Windows/macOS browser support is unfinished.
+[v0.1.0.dev8](https://github.com/errantmind/stealthish/releases/tag/v0.1.0.dev8) is a **Linux x86-64 prerelease** requiring glibc 2.31+, native browser libraries, and working Vulkan GPU support. It was measured on NVIDIA. Windows/macOS browser support is unfinished.
 
-All nine Pi tools and `/browser` controls remain. Explicit headed access permits sign-in while automation is blocked. Existing profiles are not imported automatically. See [Pi use](docs/pi-browser.md) or [standalone CLI/API use](docs/operating.md).
+All nine Pi tools and `/browser` controls remain. Explicit headed access permits sign-in while automation is blocked. Existing profiles are not imported automatically. See the [Pi browser guide](https://github.com/errantmind/pi-extensions/blob/main/extensions/internet-browser/README.md) for setup and controls.
 
 ## Evidence and limits
 
-Real Python-documentation/MDN browsing, concurrent first use, missing-browser repair, and both detector startup orders passed. Dev7 anonymous downloads, automatic first use from an empty directory, and the normal dev6-to-dev7 application update also passed.
+Real Python-documentation/MDN browsing, concurrent first use, missing-browser repair, and local detector checks passed. Dev8 anonymous downloads, automatic installation from an empty directory, and the normal dev7-to-dev8 application update passed.
 
-Kagi authentication and Cloudflare checks remain pending. Worker, scrolling, GPU, optional-API, and PDF results are recorded in [concealment](docs/concealment.md) and [setup results](docs/research/2026-11-11-automatic-setup-results.md).
+Live Kagi search returned 27 parsed results. The original failing query passed through Turnstile automatically and returned a confirmed empty result, without challenge input or a navigation retry. The local detector run retained the prior results, including bot-signal behavior at 0.30.
 
 ## Reference
 
-- [Design](DESIGN.md), [architecture](docs/runtime-architecture.md), [operation contracts](docs/product-spec.md).
-- [Publication](docs/publishing.md), [maintenance/recovery](docs/manual-updates.md).
-- [Handoff](docs/HANDOFF.md), [remaining work](docs/roadmap.md), [detector commands](docs/detector-checks.md).
+- [Design](DESIGN.md).
+- [Published releases](https://github.com/errantmind/stealthish/releases).
+- [Pi extension](https://github.com/errantmind/pi-extensions/tree/main/extensions/internet-browser).
+
+Detailed documentation and experiment records remain local in ignored `docs/` and `evidence/` directories.
 
 `src/stealthish/` ships. Detector support in `src/stealthish_lab/` and `fixtures/` does not. `distribution/` and `tools/build_release.py` define releases. Profiles, binaries, environments, backups, and raw artifacts stay outside Git. Only detector integration tests are retained; ordinary workflow checks use real sites.
