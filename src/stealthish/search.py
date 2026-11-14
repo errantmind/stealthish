@@ -40,7 +40,10 @@ COLLECT = r"""({engine, empty}) => {
     }
     const main=document.querySelector('main,#search-results') || document.body;
     const text=main ? main.innerText.slice(0,100000).toLowerCase() : '';
-    const noResults=empty.some(phrase=>text.includes(phrase)) && !has('h2 a[href], h3 a[href], a:has(h2), a:has(h3)');
+    const emptyHeading=engine.id==='kagi' && [...document.querySelectorAll('main h1')].some(e=>
+        visible(e) && ["we haven't found anything.", "we haven’t found anything."].includes(e.innerText.trim().toLowerCase()));
+    const noResults=!results.length && (emptyHeading || (empty.some(phrase=>text.includes(phrase)) &&
+        !has('h2 a[href], h3 a[href], a:has(h2), a:has(h3)')));
     return {results,noResults,sourceTruncated};
 }"""
 

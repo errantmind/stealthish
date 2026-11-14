@@ -232,9 +232,10 @@ class BrowserSession:
             raise self.pause_errors[tab]
         self.check_site_pause(page.url)
         try:
-            return await self.verification.check(tab, page, initiating_url)
+            return await self.verification.check(tab, page)
         except StealthishError as error:
-            self.pause(tab, error.code, initiating_url or page.url, error)
+            if error.code in {"CHALLENGE_REQUIRED", "AUTH_REQUIRED", "CONSENT_REQUIRED"}:
+                self.pause(tab, error.code, initiating_url or page.url, error)
             raise
         except BaseException:
             error = self.verification.interrupted(tab)
@@ -259,9 +260,7 @@ class BrowserSession:
                 if type(value) not in {int, float} or not 1 <= value <= 600000:
                     raise StealthishError("INVALID_REQUEST")
                 timeout = max(timeout, value / 1000 + 20)
-            self.verification.begin(asyncio.get_running_loop().time() + timeout,
-                                    request.params.get("engine", self.config.search_engine)
-                                    if request.operation == "search" else None)
+            self.verification.begin(asyncio.get_running_loop().time() + timeout)
             async with asyncio.timeout(timeout):
                 result = await execute(self, request)
             if self.closed_tabs:

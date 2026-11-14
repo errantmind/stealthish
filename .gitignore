@@ -24,10 +24,13 @@
 /artifacts/
 /downloads/
 /logs/
-/evidence/local/
 *.log
 *.har
 *.trace.zip
+
+# Local documentation and evidence.
+/docs/
+/evidence/
 
 # Credentials and local settings.
 .env

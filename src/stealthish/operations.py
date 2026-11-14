@@ -97,6 +97,8 @@ async def execute(session, request):
         while await session.check_pause(tab, page, url):
             # Re-read after an automatic redirect; never resubmit the search.
             data, result.truncation, result.warnings, full = await search.collect(page, length, engine)
+        if tab in session.verification.attempts:
+            session.verification.attempts[tab]["parserOutcome"] = data["kind"]
         result.data = {**await tabs.context(session, tab), "engine": engine, "url": page.url, **data}
         if requested(params, "saveOnTruncation") and result.truncation["truncated"]:
             result.data["artifact"] = save_text(config, full, "txt")
@@ -167,9 +169,9 @@ async def execute(session, request):
         if state["signal"]:
             signal = state["signal"]
             raise session.verification.error(tab, page, signal,
-                                             "still-present" if signal.automatic else "human-required")
+                                             "still-present" if signal.automatic else "human-required", state)
         if not state["ready"]:
-            raise StealthishError("CHALLENGE_REQUIRED")
+            raise StealthishError("TIMEOUT")
         session.paused.pop(tab, None)
         session.pause_errors.pop(tab, None)
         session.verification.forget(tab)
