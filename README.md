@@ -10,7 +10,7 @@ At each backend startup, a Pi Agent extension discovers the most recently publis
 
 [v0.1.0.dev8](https://github.com/errantmind/stealthish/releases/tag/v0.1.0.dev8) is a **Linux x86-64 prerelease** requiring glibc 2.31+, native browser libraries, and working Vulkan GPU support. It was measured on NVIDIA. Windows/macOS browser support is unfinished.
 
-All nine Pi tools and `/browser` controls remain. Explicit headed access permits sign-in while automation is blocked. Existing profiles are not imported automatically. See the [Pi browser guide](https://github.com/errantmind/pi-extensions/blob/main/extensions/internet-browser/README.md) for setup and controls.
+All nine Pi tools and `/browser` controls remain. Explicit headed access permits sign-in while automation is blocked. Existing profiles are not imported automatically. See the [Pi browser guide](https://github.com/errantmind/pi-extensions/blob/master/extensions/internet-browser/README.md) for setup and controls.
 
 ## Evidence and limits
 
@@ -20,7 +20,7 @@ Passes bot checks undetected.
 
 - [Design](DESIGN.md).
 - [Published releases](https://github.com/errantmind/stealthish/releases).
-- [Pi extension](https://github.com/errantmind/pi-extensions/tree/main/extensions/internet-browser).
+- [Pi extension](https://github.com/errantmind/pi-extensions/tree/master/extensions/internet-browser).
 
 Detailed documentation and experiment records remain local in ignored `docs/` and `evidence/` directories.
 
