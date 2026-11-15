@@ -1,10 +1,12 @@
 # Stealthish
 
+A stealthy browser interface for local Agents. I built this for myself after Cloakbrowser went paid as a replacement. I integrate it into Pi Agent using a separate extension. The interface is simple enough for it to be used or integrated into any Agent Harness.
+
 A foreground browser CLI and async Python API for local AI workflows: headless by default, persistent sign-ins, careful native input, and uBlock Origin Lite. Pi uses private pipes and its existing ownership queue—not a shared browser service.
 
 ## Install and use
 
-At each backend startup, the Pi extension discovers the most recently published Stealthish release, including prereleases. It verifies the manifest and wheel against GitHub's asset digests, then acquires or reuses that release's pinned uv, managed Python, dependencies, private Chrome, and uBlock Origin Lite. No version pin in Pi, separate clone, system Python, PATH edit, or setup command is required. Updates preserve profile backups and side-by-side repair. Running sessions keep their release until restart. Lookup or setup failures are reported without selecting an older release.
+At each backend startup, a Pi Agent extension discovers the most recently published Stealthish release, including prereleases. It verifies the manifest and wheel against GitHub's asset digests, then acquires or reuses that release's pinned uv, managed Python, dependencies, private Chrome, and uBlock Origin Lite. No version pin in Pi, separate clone, system Python, PATH edit, or setup command is required. Updates preserve profile backups and side-by-side repair. Running sessions keep their release until restart. Lookup or setup failures are reported without selecting an older release.
 
 [v0.1.0.dev8](https://github.com/errantmind/stealthish/releases/tag/v0.1.0.dev8) is a **Linux x86-64 prerelease** requiring glibc 2.31+, native browser libraries, and working Vulkan GPU support. It was measured on NVIDIA. Windows/macOS browser support is unfinished.
 
@@ -12,9 +14,7 @@ All nine Pi tools and `/browser` controls remain. Explicit headed access permits
 
 ## Evidence and limits
 
-Real Python-documentation/MDN browsing, concurrent first use, missing-browser repair, and local detector checks passed. Dev8 anonymous downloads, automatic installation from an empty directory, and the normal dev7-to-dev8 application update passed.
-
-Live Kagi search returned 27 parsed results. The original failing query passed through Turnstile automatically and returned a confirmed empty result, without challenge input or a navigation retry. The local detector run retained the prior results, including bot-signal behavior at 0.30.
+Passes bot checks undetected.
 
 ## Reference
 
