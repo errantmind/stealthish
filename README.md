@@ -1,6 +1,6 @@
 # Stealthish
 
-A stealthy browser interface for local Agents. I built this for myself after Cloakbrowser went paid as a replacement. I integrate it into Pi Agent using a separate extension. The interface is simple enough for it to be used or integrated into any Agent Harness.
+A stealthy browser interface for local Agents. I built this for myself as an alternative to Cloakbrowser after it went paid as a replacement. I integrate it into Pi Agent using a separate extension. The interface is simple enough for it to be used or integrated into any Agent Harness.
 
 A foreground browser CLI and async Python API for local AI workflows: headless by default, persistent sign-ins, careful native input, and uBlock Origin Lite. Pi uses private pipes and its existing ownership queue—not a shared browser service.
 
