@@ -46,10 +46,13 @@ class Challenges:
             await asyncio.sleep(0.25)
             state = await inspect(page)
         signal = state["signal"]
+        session.verification.authentication[tab] = state.get("authentication")
         if signal is not None:
             origin = session.pause_origins.get(tab)
-            session.pause(tab, signal.code, f"https://{origin}/" if origin else page.url,
-                          StealthishError(signal.code, data={"rule": signal.rule}))
+            error = (session.verification.error(tab, page, signal, "human-required", state)
+                     if signal.code == "AUTH_REQUIRED" else
+                     StealthishError(signal.code, data={"rule": signal.rule}))
+            session.pause(tab, signal.code, f"https://{origin}/" if origin else page.url, error)
             entry = self.entries.get(tab)
             if entry and urlsplit(page.url).hostname not in entry["hosts"]:
                 entry["outsideScope"] = True
@@ -65,6 +68,7 @@ class Challenges:
         result = Result(request_id, status="paused" if code != "OK" else "ok", code=code,
                         effect=session.effect)
         if code != "OK":
+            result.data.update(session.pause_errors[tab].data)
             result.data["message"] = str(session.pause_errors[tab])
             result.data["challenge"] = self.info(tab)
             if result.data["challenge"] and not result.data["challenge"]["allowInput"]:
@@ -73,8 +77,9 @@ class Challenges:
             elif result.data["challenge"] and not state["ready"]:
                 result.data["challenge"].update(state="loading", allowInput=False, allowWait=True)
         else:
-            result.data["challenge"] = {"state": "cleared", "allowInput": False,
-                                        "verificationId": previous["verificationId"] if previous else None}
+            result.data["challenge"] = ({"state": "cleared", "allowInput": False,
+                                         "verificationId": previous["verificationId"]}
+                                        if previous else None)
             if tab in session.pending_search:
                 from .operations import collect_search
                 collected = await collect_search(session, tab, page, request_id,

@@ -30,7 +30,7 @@ MESSAGES = {
     "CONTENT_LIMIT": "The document exceeds the supported extraction limit. No partial article was returned.",
     "CHALLENGE_REQUIRED": "Site verification is incomplete. The site is paused. No retry was made.",
     "ACCESS_DENIED": "The site denied access. Inspect the image and report the block; do not repeat the request.",
-    "AUTH_REQUIRED": "The site requires authentication. No further input was sent.",
+    "AUTH_REQUIRED": "This page requires sign-in. Other public pages on this site remain available.",
     "CONSENT_REQUIRED": "The site requires user consent. No consent was submitted.",
     "MANUAL_ACCESS": "The browser is held for manual use. Return control with headless mode before automation.",
 }

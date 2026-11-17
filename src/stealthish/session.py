@@ -16,7 +16,7 @@ from .ownership import ProfileLock, private_directory
 from .protocol import Request, Result
 from .references import References
 from .release import BROWSER_VERSION, load_release
-from .verification import Verification
+from .verification import Verification, inspect
 from .visual import Observations
 from .challenges import Challenges, PAUSE_CODES
 
@@ -167,10 +167,20 @@ class BrowserSession:
         if self.config.headless:
             self.input.attach(page)
             page.on("response", lambda response: self.verification.response(tab, page, response))
-        page.on("framenavigated", lambda _: self.invalidate(tab))
+        page.on("framenavigated", lambda frame: self._frame_navigated(tab, page, frame))
         page.on("close", lambda: self._page_closed(tab))
         if self.selected is None:
             self.selected = tab
+
+    def _frame_navigated(self, tab, page, frame):
+        self.invalidate(tab)
+        # Authentication applies to one document. Check the next document afresh.
+        if frame == page.main_frame and self.paused.get(tab) == "AUTH_REQUIRED":
+            self.clear_pause(tab)
+
+    def _refresh_paused_sites(self):
+        self.paused_sites = {site for tab, site in self.pause_origins.items()
+                             if site and self.paused.get(tab) not in {None, "AUTH_REQUIRED"}}
 
     def _page_closed(self, tab):
         self.pages.pop(tab, None)
@@ -182,9 +192,8 @@ class BrowserSession:
         self.paused.pop(tab, None)
         self.pause_errors.pop(tab, None)
         self.verification.forget(tab)
-        site = self.pause_origins.pop(tab, None)
-        if site and site not in self.pause_origins.values():
-            self.paused_sites.discard(site)
+        self.pause_origins.pop(tab, None)
+        self._refresh_paused_sites()
         if self.selected == tab:
             self.selected = max(self.pages, key=lambda key: self.access.get(key, 0), default=None)
 
@@ -231,19 +240,17 @@ class BrowserSession:
         self.paused.pop(tab, None)
         self.pause_errors.pop(tab, None)
         self.challenges.forget(tab)
-        site = self.pause_origins.pop(tab, None)
-        if site and site not in self.pause_origins.values():
-            self.paused_sites.discard(site)
+        self.pause_origins.pop(tab, None)
+        self._refresh_paused_sites()
 
     def pause(self, tab, code, url, error=None):
         changed = self.paused.get(tab) != code
         self.paused[tab] = code
         self.pause_errors[tab] = error or StealthishError(code)
-        self.pause_errors[tab].data["tabId"] = tab
+        self.pause_errors[tab].data.update(tabId=tab, pauseScope="document" if code == "AUTH_REQUIRED" else "site")
         site = self.pause_origins.get(tab) or urlsplit(url).hostname
         self.pause_origins[tab] = site
-        if site:
-            self.paused_sites.add(site)
+        self._refresh_paused_sites()
         if code == "CHALLENGE_REQUIRED":
             self.challenges.start(tab, url, self.pages[tab].url)
         else:
@@ -254,18 +261,33 @@ class BrowserSession:
     def check_site_pause(self, url):
         site = urlsplit(url).hostname
         if site in self.paused_sites:
-            tab = next(key for key, value in self.pause_origins.items() if value == site)
+            tab = next(key for key, value in self.pause_origins.items()
+                       if value == site and self.paused.get(key) != "AUTH_REQUIRED")
             raise self.pause_errors[tab]
 
-    async def check_pause(self, tab, page, initiating_url=None):
-        if tab in self.paused:
+    async def check_pause(self, tab, page, initiating_url=None, *, allow_auth_navigation=False):
+        previous = self.paused.get(tab)
+        if previous and previous != "AUTH_REQUIRED":
             raise self.pause_errors[tab]
         self.check_site_pause(page.url)
+        state = None
+        if previous == "AUTH_REQUIRED":
+            state = await inspect(page)
+            self.verification.authentication[tab] = state.get("authentication")
+            if state["signal"] is None and not state["ready"]:
+                if allow_auth_navigation:
+                    return False
+                raise self.pause_errors[tab]
         try:
-            return await self.verification.check(tab, page)
+            cleared = await self.verification.check(tab, page, state=state)
+            if previous == "AUTH_REQUIRED":
+                self.clear_pause(tab)
+            return cleared
         except StealthishError as error:
             if error.code in PAUSE_CODES:
                 self.pause(tab, error.code, initiating_url or page.url, error)
+            if error.code == "AUTH_REQUIRED" and allow_auth_navigation:
+                return False
             raise
         except BaseException:
             error = self.verification.interrupted(tab)
@@ -328,6 +350,15 @@ class BrowserSession:
         observations = [self.verification.details(tab) for tab in self.verification.attempts]
         if observations and "verification" not in result.data:
             result.data["verification"] = observations[-1]
+        tab = result.data.get("tabId")
+        if tab in self.verification.authentication:
+            authentication = self.verification.authentication[tab]
+            if authentication is None:
+                result.data.pop("authentication", None)
+            else:
+                result.data["authentication"] = authentication
+        if result.status != "paused":
+            result.data.pop("pauseScope", None)
         if request.operation == "close":
             await self.close()
         return result

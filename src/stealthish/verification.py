@@ -20,6 +20,25 @@ INSPECT = r"""() => {
     const text=main ? main.innerText.slice(0,100000).toLowerCase() : '';
     const ready=!!document.body && ['interactive','complete'].includes(document.readyState);
     const signal=(code,rule,automatic=false)=>({code,rule,automatic});
+    const fields="input[type='password'], input[autocomplete='username'], input[type='email']";
+    const authForm=root => [...root.querySelectorAll('form')].some(form =>
+        visible(form) && [...form.querySelectorAll(fields)].some(visible));
+    const authTitle=e => visible(e) && /^(?:sign[ -]?in|log[ -]?in|authentication required)(?:\s+(?:to|with)\s+[^\n]{1,100})?[.!:]?$/i.test(e.innerText.trim());
+    const formPresent=has("form input[type='password']") || authForm(document);
+    // A form in a sidebar/header, or a prompt to sign in to comment, is optional.
+    // Require an explicit sign-in heading in the primary content or a modal.
+    const primary=document.querySelector('main,[role="main"]') || document.body;
+    const primaryHeading=primary && [...primary.querySelectorAll('h1')].find(e =>
+        visible(e) && !e.closest('header,nav,aside,footer,[role="banner"],[role="navigation"],[role="complementary"]'));
+    const primaryForms=primary && [...primary.querySelectorAll('form')].filter(form =>
+        !form.closest('header,nav,aside,footer,[role="banner"],[role="navigation"],[role="complementary"]'));
+    const signInPage=authTitle(primaryHeading) && primaryForms.some(form =>
+        visible(form) && [...form.querySelectorAll(fields)].some(visible));
+    const modal=[...document.querySelectorAll('dialog:modal,[role="dialog"][aria-modal="true"]')]
+        .find(e => visible(e) && authForm(e) && [...e.querySelectorAll('h1,h2,h3,[role="heading"]')].some(authTitle));
+    const authRule=modal ? 'blocking-sign-in-dialog' : signInPage ? 'primary-sign-in-form' : null;
+    const authentication=authRule ? {state:'required',required:true,scope:'document',rule:authRule} :
+        formPresent ? {state:'form-present',required:false} : null;
     let found=null;
     if (/^\s*(?:you['’]ve been blocked by network security|sorry, you have been blocked)[.!]?\s*$/m.test(text))
         found=signal('ACCESS_DENIED','network-denied');
@@ -35,9 +54,9 @@ INSPECT = r"""() => {
         found=signal('CHALLENGE_REQUIRED','human-verification-text');
     else if (has("form[action*='consent']"))
         found=signal('CONSENT_REQUIRED','consent-form');
-    else if (has("form input[type='password']"))
-        found=signal('AUTH_REQUIRED','password-form');
-    return {signal:found,ready,documentState:document.readyState};
+    else if (authRule)
+        found=signal('AUTH_REQUIRED',authRule);
+    return {signal:found,authentication,ready,documentState:document.readyState};
 }"""
 
 
@@ -65,9 +84,7 @@ async def inspect(page):
     host, route = parsed.hostname or "", parsed.path.rstrip("/")
     route_signal = None
     if host in {"kagi.com", "www.kagi.com"}:
-        if route in {"/signin", "/login"}:
-            route_signal = Signal("AUTH_REQUIRED", "kagi-sign-in-route")
-        elif route == "/turnstile":
+        if route == "/turnstile":
             route_signal = Signal("CHALLENGE_REQUIRED", "kagi-turnstile-route", True)
     if host.startswith("consent."):
         route_signal = Signal("CONSENT_REQUIRED", "consent-route")
@@ -83,6 +100,11 @@ async def inspect(page):
             raise
         return {"signal": route_signal, "ready": False, "documentState": "transition", "url": url}
     signal = Signal(**state["signal"]) if state["signal"] else None
+    # The known sign-in route must also contain a visible credential form.
+    if host in {"kagi.com", "www.kagi.com"} and route in {"/signin", "/login"} and state.get("authentication"):
+        route_signal = Signal("AUTH_REQUIRED", "kagi-sign-in-form")
+        state["authentication"] = {"state": "required", "required": True,
+                                   "scope": "document", "rule": route_signal.rule}
     if route_signal is not None:
         # A visible check takes priority over the login page underneath it.
         if signal is None or signal.code in {"AUTH_REQUIRED", "CONSENT_REQUIRED"} or \
@@ -98,6 +120,7 @@ class Verification:
     def __init__(self):
         self.navigation = {}
         self.attempts = {}
+        self.authentication = {}
         self.deadline = 0.0
         self.wait_deadline = None
 
@@ -106,10 +129,12 @@ class Verification:
         self.wait_deadline = None
         self.navigation.clear()
         self.attempts.clear()
+        self.authentication.clear()
 
     def forget(self, tab):
         self.navigation.pop(tab, None)
         self.attempts.pop(tab, None)
+        self.authentication.pop(tab, None)
 
     def response(self, tab, page, response):
         """Read existing main-document events; never request headers or bodies."""
@@ -158,6 +183,10 @@ class Verification:
         message = None
         if code == "TIMEOUT":
             message = "The returned document did not finish loading. No active verification was observed."
+        elif code == "AUTH_REQUIRED":
+            message = ("A sign-in dialog blocks this page." if signal.rule == "blocking-sign-in-dialog"
+                       else "This document is a sign-in page.")
+            message += " Credentials require user input. Other public pages on this site remain available."
         elif code == "CHALLENGE_REQUIRED":
             if outcome == "human-required":
                 message = f"{site} presents a verification check. Normal browsing is suspended. No retry was made."
@@ -168,7 +197,10 @@ class Verification:
             else:
                 duration = round(record["elapsedMs"] / 1000, 1)
                 message = f"{site} verification did not complete within {duration:g} seconds. The site is paused. No retry was made."
-        return StealthishError(code, message=message, data={"verification": self.details(tab)})
+        data = {"verification": self.details(tab)}
+        if code == "AUTH_REQUIRED":
+            data.update(pauseScope="document", authentication=state.get("authentication") if state else None)
+        return StealthishError(code, message=message, data=data)
 
     @staticmethod
     def ready(state):
@@ -176,8 +208,9 @@ class Verification:
         return state["ready"] and state["signal"] is None and \
             urlsplit(state["url"]).scheme in {"http", "https"}
 
-    async def check(self, tab, page):
-        state = await inspect(page)
+    async def check(self, tab, page, *, state=None):
+        state = await inspect(page) if state is None else state
+        self.authentication[tab] = state.get("authentication")
         signal = state["signal"]
         if signal is None:
             return False
@@ -193,6 +226,7 @@ class Verification:
                 while True:
                     await asyncio.sleep(POLL_SECONDS)
                     state = await inspect(page)
+                    self.authentication[tab] = state.get("authentication")
                     current = state["signal"]
                     if current is not None and not current.automatic:
                         raise self.error(tab, page, current, "human-required", state)

@@ -159,7 +159,7 @@ async def execute(session, request):
         if url:
             session.check_site_pause(url)
         tab, page = await tabs.choose(session, url, policy, params.get("tabId"))
-        await session.check_pause(tab, page)
+        await session.check_pause(tab, page, allow_auth_navigation=action in {"goto", "back", "forward"})
         session.invalidate(tab)
         session.pending_search.pop(tab, None)
         session.effect = "unknown"
