@@ -10,7 +10,7 @@ import sys
 
 from .errors import StartupError
 
-VERSION = "0.1.0.dev8"
+VERSION = "0.1.0.dev9"
 DRIVER_VERSION = "1.64.4"
 DEPENDENCIES = {
     "patchright": DRIVER_VERSION, "greenlet": "3.5.6", "pyee": "14.0.0", "typing-extensions": "4.16.0",

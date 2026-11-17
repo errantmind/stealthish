@@ -10,9 +10,10 @@ MAX_LINE = 1024 * 1024
 SCHEMA = {
     "navigate": {"action", "url", "tabId", "tabPolicy", "waitUntil", "timeoutMs"},
     "snapshot": {"tabId", "maxChars", "saveArtifact", "saveOnTruncation", "boxes"},
-    "interact": {"action", "tabId", "ref", "selector", "text", "key", "x", "y", "waitAfterMs"},
+    "interact": {"action", "tabId", "ref", "selector", "text", "key", "x", "y", "waitAfterMs",
+                 "imageId", "verificationId"},
     "extract": {"tabId", "maxChars", "saveArtifact", "saveOnTruncation", "includeHtml"},
-    "screenshot": {"tabId", "fullPage"},
+    "screenshot": {"tabId", "fullPage", "clip", "waitAfterMs"},
     "tabs": {"action", "tabId", "url", "waitUntil", "timeoutMs"},
     "session_status": set(), "close": set(), "manual_open": {"url"},
     "resume": {"tabId", "confirmed"}, "restart": {"acknowledgeStateLoss"},
@@ -21,6 +22,7 @@ SCHEMA = {
 
 
 CAPABILITIES = {"piAdapter": 1, "manualMode": True, "boxes": True,
+                "visualInput": 1, "visualVerification": 1,
                 "tabPolicy": ["strict", "lru"], "searchEngines": [
                     "kagi", "google", "bing", "yahoo", "duckduckgo", "brave"]}
 

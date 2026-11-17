@@ -1,4 +1,4 @@
-"""Passive verification handling. No input, navigation, or extra web requests."""
+"""Page classification and bounded passive verification. No navigation retries."""
 import asyncio
 from collections import deque
 from dataclasses import dataclass
@@ -13,27 +13,30 @@ SAFE_ROUTES = {"/", "/search", "/turnstile", "/signin", "/login", "/sorry", "/ca
 
 # Runs in the driver's existing isolated world. Return classifications, not text.
 INSPECT = r"""() => {
-    const visible=e => !!e && getComputedStyle(e).visibility!=='hidden' && e.getClientRects().length>0;
+    const visible=e => !!e && e.checkVisibility({checkOpacity:true,checkVisibilityCSS:true}) &&
+        [...e.getClientRects()].some(r => r.width>1 && r.height>1);
     const has=s => [...document.querySelectorAll(s)].some(visible);
     const main=document.querySelector('main,#search-results') || document.body;
     const text=main ? main.innerText.slice(0,100000).toLowerCase() : '';
     const ready=!!document.body && ['interactive','complete'].includes(document.readyState);
     const signal=(code,rule,automatic=false)=>({code,rule,automatic});
     let found=null;
-    if (has('iframe[src*="recaptcha"][title*="challenge" i]'))
-        found=signal('CHALLENGE_REQUIRED','recaptcha-interaction');
-    else if (has('#captcha-form, #challenge-form, .g-recaptcha, .anomaly-modal'))
-        found=signal('CHALLENGE_REQUIRED','challenge-form');
-    else if (has("form[action*='consent']"))
-        found=signal('CONSENT_REQUIRED','consent-form');
-    else if (has("form input[type='password']"))
-        found=signal('AUTH_REQUIRED','password-form');
+    if (/^\s*(?:you['’]ve been blocked by network security|sorry, you have been blocked)[.!]?\s*$/m.test(text))
+        found=signal('ACCESS_DENIED','network-denied');
+    else if (has('iframe[src*="recaptcha"][title*="challenge" i], iframe[src*="hcaptcha"][title*="challenge" i]'))
+        found=signal('CHALLENGE_REQUIRED','image-verification');
     else if (has('iframe[src*="challenges.cloudflare.com"], #challenge-running, #challenge-stage, #cf-challenge-running'))
         found=signal('CHALLENGE_REQUIRED','cloudflare-verification',true);
+    else if (has('#captcha-form, #challenge-form, .g-recaptcha, .h-captcha, .anomaly-modal'))
+        found=signal('CHALLENGE_REQUIRED','challenge-form',true);
     else if (/^\s*our systems have detected unusual traffic[^\n]*$/m.test(text))
         found=signal('CHALLENGE_REQUIRED','unusual-traffic');
     else if (/^\s*(?:please )?verify you are human to continue[.!]?\s*$/m.test(text))
         found=signal('CHALLENGE_REQUIRED','human-verification-text');
+    else if (has("form[action*='consent']"))
+        found=signal('CONSENT_REQUIRED','consent-form');
+    else if (has("form input[type='password']"))
+        found=signal('AUTH_REQUIRED','password-form');
     return {signal:found,ready,documentState:document.readyState};
 }"""
 
@@ -81,9 +84,9 @@ async def inspect(page):
         return {"signal": route_signal, "ready": False, "documentState": "transition", "url": url}
     signal = Signal(**state["signal"]) if state["signal"] else None
     if route_signal is not None:
-        # A route or Turnstile frame is not proof that human input is required.
-        if not route_signal.automatic or signal is None or signal.automatic or \
-                signal.rule == "human-verification-text":
+        # A visible check takes priority over the login page underneath it.
+        if signal is None or signal.code in {"AUTH_REQUIRED", "CONSENT_REQUIRED"} or \
+                (route_signal.automatic and signal.automatic):
             signal = route_signal
     if page.url != url:
         state.update(ready=False, documentState="transition")
@@ -157,7 +160,7 @@ class Verification:
             message = "The returned document did not finish loading. No active verification was observed."
         elif code == "CHALLENGE_REQUIRED":
             if outcome == "human-required":
-                message = f"{site} requests human verification. The site is paused. No retry was made."
+                message = f"{site} presents a verification check. Normal browsing is suspended. No retry was made."
             elif outcome == "interrupted":
                 message = f"{site} verification was interrupted. The site remains paused. No retry was made."
             elif outcome == "still-present":

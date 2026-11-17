@@ -55,14 +55,16 @@ def stage_assets(run):
 
 class Subject:
     """Product actions use Request. Raw page access below is test observation only."""
-    def __init__(self, session, context, product):
+    def __init__(self, session, context, product, visual=False):
         self.session, self.context, self.product = session, context, product
+        self.visual = visual
         self.calls = []
 
     async def request(self, operation, params):
         from stealthish import Request
         response = await self.session.execute(Request(str(len(self.calls) + 1), operation, params))
-        self.calls.append({'operation': operation, 'action': params.get('action'), 'code': response.code})
+        self.calls.append({'operation': operation, 'action': params.get('action'), 'code': response.code,
+                           'visual': 'imageId' in params})
         if response.code != 'OK':
             raise RuntimeError(f'Product operation failed: {operation}: {response.code}')
         return response
@@ -83,6 +85,16 @@ class Subject:
 
     async def interact(self, page, action, **params):
         if self.product:
+            if self.visual and action in ('hover', 'click') and 'selector' in params:
+                box = await page.locator(params['selector']).bounding_box()
+                image = (await self.request('screenshot', {'tabId': self.tab(page)})).data['image']
+                if box:
+                    left, top = max(0, box['x']), max(0, box['y'])
+                    right = min(image['width'], box['x'] + box['width'])
+                    bottom = min(image['height'], box['y'] + box['height'])
+                    if right > left and bottom > top:
+                        params = {'imageId': image['imageId'], 'x': (left + right) / 2,
+                                  'y': (top + bottom) / 2}
             return await self.request('interact', {'tabId': self.tab(page), 'action': action, **params})
         target = page.locator(params['selector']) if 'selector' in params else None
         if action in ('hover', 'click'):
@@ -102,11 +114,11 @@ class Subject:
 
 
 @asynccontextmanager
-async def subject(config, mode):
+async def subject(config, mode, visual=False):
     from stealthish import BrowserSession
     if mode == 'product':
         async with BrowserSession(config) as session:
-            yield Subject(session, session._context, True)
+            yield Subject(session, session._context, True, visual)
     else:
         # Same installed environment, genuine Chrome, GPU and blocker. No identity
         # adaptation or human-input patch. Not a supported product configuration.
@@ -292,7 +304,7 @@ async def additional(subject, origin, name):
         await subject.close_page(page)
 
 
-async def exercise(config, mode, order, staged, report):
+async def exercise(config, mode, order, staged, report, visual=False):
     from stealthish_lab.rebrowser_fixtures import rebrowser_servers
     from stealthish_lab.additional_fixtures import additional_server
     from stealthish_lab.fixtures import fixture_servers
@@ -305,7 +317,7 @@ async def exercise(config, mode, order, staged, report):
         rb, foreign = stack.enter_context(rebrowser_servers(staged, requests['rebrowser'], script_gate=gate))
         early, _ = stack.enter_context(fixture_servers(staged, observations=requests['earlier'], script_gate=gate))
         extra = stack.enter_context(additional_server(staged, requests['additional']))
-        async with subject(config, mode) as client:
+        async with subject(config, mode, visual) as client:
             report['processEvidence'] = process_evidence(config.data_dir / 'profile')
             # Include every collection failure. No retry based on a verdict.
             jobs = [('rebrowser', lambda: rebrowser(client, rb, foreign, requests['rebrowser'], gate)),
@@ -340,7 +352,8 @@ def child(run):
     sys.path.remove(str(ROOT / 'src'))
     sys.path.remove(str(ROOT / 'tools'))
     invocation = json.loads((run / 'invocation.json').read_text())
-    report = {'mode': invocation['mode'], 'order': invocation['order'], 'startedAt': datetime.now(timezone.utc).isoformat()}
+    report = {'mode': invocation['mode'], 'order': invocation['order'],
+              'visualInput': invocation.get('visualInput', False), 'startedAt': datetime.now(timezone.utc).isoformat()}
     try:
         report['containment'] = preflight(invocation['namespaces'], invocation['canary'], ROOT)
         from stealthish import SessionConfig
@@ -361,7 +374,8 @@ def child(run):
         sys.addaudithook(audit)
         config = SessionConfig.load(run / 'data/config.toml')
         asyncio.run(initial_setup(config))
-        asyncio.run(exercise(config, invocation['mode'], invocation['order'], run / 'staged', report))
+        asyncio.run(exercise(config, invocation['mode'], invocation['order'], run / 'staged', report,
+                             invocation.get('visualInput', False)))
         report['status'] = 'PASS'
     except BaseException as error:
         report['status'] = 'FAIL'
@@ -373,7 +387,7 @@ def child(run):
     return 0 if report['status'] == 'PASS' else 1
 
 
-def outer(mode, order):
+def outer(mode, order, visual=False):
     sys.path.insert(0, str(ROOT / 'src'))
     from stealthish_lab.setup import HostCanary
     from stealthish_lab.containment import sandbox_command, namespace
@@ -389,7 +403,7 @@ def outer(mode, order):
     with HostCanary() as canary:
         (run / 'invocation.json').write_text(json.dumps({
             'namespaces': {x: namespace(x) for x in ('net', 'pid', 'mnt', 'user')},
-            'canary': canary.port, 'mode': mode, 'order': order, 'wheelSHA256': sha(WHEEL),
+            'canary': canary.port, 'mode': mode, 'order': order, 'visualInput': visual, 'wheelSHA256': sha(WHEEL),
             'installedEnvironment': str(ENV),
             'sourceHashes': hashes, 'packagingHashes': {n: sha(ROOT / n) for n in ('pyproject.toml', 'uv.lock')},
         }, indent=2) + '\n')
@@ -414,9 +428,10 @@ if __name__ == '__main__':
     parser.add_argument('--environment', type=Path, help='Installed environment under this project .runtime; never a production profile.')
     parser.add_argument('--mode', choices=('product', 'stock-control'), default='product')
     parser.add_argument('--order', choices=('natural', 'preloaded'), default='natural')
+    parser.add_argument('--visual-input', action='store_true', help='Use screenshots and coordinates for visible detector input targets.')
     args = parser.parse_args()
     if args.environment:
         ENV = args.environment.resolve()
         if not ENV.is_relative_to(ROOT / '.runtime') or not (ENV / 'bin/python').is_file():
             raise ValueError('Use an installed environment under .runtime.')
-    raise SystemExit(child(args.child) if args.child else outer(args.mode, args.order))
+    raise SystemExit(child(args.child) if args.child else outer(args.mode, args.order, args.visual_input))

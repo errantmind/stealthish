@@ -7,7 +7,7 @@ Stealthish is a foreground CLI and async Python browser API for local AI workflo
 - Headless by default. Explicit headed access permits manual use; automation stops until the user returns control. No automatic headed fallback, virtual display, login command, or credential subsystem.
 - One persistent profile per computer, one foreground owner, one active operation. Conflicts return `PROFILE_BUSY` or `SESSION_BUSY`. Pi owns its queue outside the product; no shared browser service or network control port.
 - Stealthish is the only backend. Existing legacy runtimes and profiles remain separate; there is no fallback or automatic credential migration.
-- Automatic verification permits one passive wait of up to 10 seconds within the operation deadline. Persistent checks, required interaction, and authentication pause that site. Unrelated sites may continue. No challenge retries or automatic replay of actions with uncertain effects.
+- Automatic verification permits one passive wait of up to 10 seconds. An interactive check suspends normal browsing but exposes its image and an encounter-scoped native-input path. The agent can complete image grids through screenshot → input → screenshot turns. Authentication, consent, denied access, and exhausted budgets require user action. No challenge reload, query replay, or automatic headed fallback. Unrelated sites may continue.
 
 ## Browser policy
 
@@ -25,7 +25,7 @@ The release manifest lists supported OS/architecture combinations. Each platform
 
 ## Data and validation
 
-Use the host connection without proxies. Keep profiles, credentials, input text, tokens, and raw artifacts outside Git and normal logs. Manual access blocks automated observation and input.
+Use the host connection without proxies. Keep profiles, credentials, input text, tokens, and raw artifacts outside Git and normal logs. Manual access blocks automated observation and input. Viewport/crop images use CSS-pixel capture and carry one-use coordinate mappings; full-page images are observation-only. Pi receives images directly in tool results. The existing model selects actions; no solver service or extra model is required.
 
 Retain only browser-level bot-detection integration suites. Normal workflows use real sites through the actual product—not fake Kagi, search APIs, substitute browsers, unit suites, or general fault-injection fixtures. Detector runs require verified network-namespace isolation and disabled BotD monitoring. Interception alone is insufficient. Keep detector rules unchanged; missing checks are not passes, and favorable random input must not be selected.
 

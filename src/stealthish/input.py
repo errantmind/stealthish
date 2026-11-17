@@ -11,13 +11,26 @@ class Input:
         if not hasattr(page._impl_obj, "_cloak_human"):
             patch_page_async(page, self.config)
 
-    async def perform(self, page, params, ref=None):
+    async def perform(self, page, params, ref=None, point=None):
         self.attach(page)
         action = params.get("action")
         if action not in {"click", "fill", "type", "press", "key", "hover", "scroll"}:
             raise StealthishError("UNSUPPORTED")
         if ref and params.get("selector"):
             raise StealthishError("INVALID_REQUEST")
+        if point is not None:
+            if action not in {"click", "hover"} or ref or params.get("selector"):
+                raise StealthishError("INVALID_REQUEST")
+            if action == "click":
+                await page.mouse.click(*point)
+            else:
+                await page.mouse.move(*point)
+            return
+        if action == "type" and params.get("imageId") and not ref and not params.get("selector"):
+            if not isinstance(params.get("text"), str):
+                raise StealthishError("INVALID_REQUEST")
+            await page.keyboard.type(params["text"])
+            return
         handle = None
         try:
             if ref:

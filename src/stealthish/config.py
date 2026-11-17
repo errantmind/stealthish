@@ -31,18 +31,22 @@ class SessionConfig:
     search_engine: str = "kagi"
     headless: bool = True
     tab_policy: str = "strict"
+    verification_actions: int = 40
+    verification_timeout: float = 300
 
     def __post_init__(self):
         try:
             path = Path(self.data_dir).expanduser().resolve()
             if not path.is_absolute() or not RELEASE_ID.fullmatch(self.release):
                 raise ValueError()
-            for value in (self.action_timeout, self.navigation_timeout):
+            for value in (self.action_timeout, self.navigation_timeout, self.verification_timeout):
                 if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 < value <= 600:
                     raise ValueError()
             if type(self.text_limit) is not int or not 1 <= self.text_limit <= 100000:
                 raise ValueError()
             if type(self.tab_limit) is not int or not 1 <= self.tab_limit <= 20:
+                raise ValueError()
+            if type(self.verification_actions) is not int or not 1 <= self.verification_actions <= 100:
                 raise ValueError()
             if self.rendering != "linux-vulkan" or self.search_engine not in {
                 "kagi", "google", "bing", "yahoo", "duckduckgo", "brave"
@@ -63,7 +67,7 @@ class SessionConfig:
             document = tomllib.loads((path or config_path).read_text(encoding="utf-8"))
             allowed = {"schema_version", "release", "data_dir", "action_timeout",
                        "navigation_timeout", "text_limit", "tab_limit", "rendering", "search_engine",
-                       "headless", "tab_policy"}
+                       "headless", "tab_policy", "verification_actions", "verification_timeout"}
             if set(document) - allowed or type(document.get("schema_version")) is not int:
                 raise ValueError()
             if document.pop("schema_version") != 1:

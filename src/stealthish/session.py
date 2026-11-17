@@ -17,6 +17,8 @@ from .protocol import Request, Result
 from .references import References
 from .release import BROWSER_VERSION, load_release
 from .verification import Verification
+from .visual import Observations
+from .challenges import Challenges, PAUSE_CODES
 
 
 class BrowserSession:
@@ -40,6 +42,9 @@ class BrowserSession:
         self.paused_sites = set()
         self.verification = Verification()
         self.refs = References()
+        self.images = Observations()
+        self.challenges = Challenges(config)
+        self.pending_search = {}
         self.input = Input()
         self.effect = "none"
         self._popup_tasks = set()
@@ -127,6 +132,9 @@ class BrowserSession:
             self.closed_tabs.clear()
             self.selected = None
             self.refs = References()
+            self.images = Observations()
+            self.challenges = Challenges(self.config)
+            self.pending_search.clear()
             self.input = Input()
             self.paused.clear()
             self.pause_origins.clear()
@@ -159,7 +167,7 @@ class BrowserSession:
         if self.config.headless:
             self.input.attach(page)
             page.on("response", lambda response: self.verification.response(tab, page, response))
-        page.on("framenavigated", lambda _: self.refs.invalidate(tab))
+        page.on("framenavigated", lambda _: self.invalidate(tab))
         page.on("close", lambda: self._page_closed(tab))
         if self.selected is None:
             self.selected = tab
@@ -168,6 +176,9 @@ class BrowserSession:
         self.pages.pop(tab, None)
         self.access.pop(tab, None)
         self.refs.invalidate(tab)
+        self.images.forget(tab)
+        self.challenges.forget(tab)
+        self.pending_search.pop(tab, None)
         self.paused.pop(tab, None)
         self.pause_errors.pop(tab, None)
         self.verification.forget(tab)
@@ -212,14 +223,33 @@ class BrowserSession:
         self.touch(tab)
         return tab, self.pages[tab]
 
+    def invalidate(self, tab):
+        self.refs.invalidate(tab)
+        self.images.invalidate(tab)
+
+    def clear_pause(self, tab):
+        self.paused.pop(tab, None)
+        self.pause_errors.pop(tab, None)
+        self.challenges.forget(tab)
+        site = self.pause_origins.pop(tab, None)
+        if site and site not in self.pause_origins.values():
+            self.paused_sites.discard(site)
+
     def pause(self, tab, code, url, error=None):
+        changed = self.paused.get(tab) != code
         self.paused[tab] = code
         self.pause_errors[tab] = error or StealthishError(code)
-        site = urlsplit(url).hostname
+        self.pause_errors[tab].data["tabId"] = tab
+        site = self.pause_origins.get(tab) or urlsplit(url).hostname
         self.pause_origins[tab] = site
         if site:
             self.paused_sites.add(site)
-        self.refs.invalidate(tab)
+        if code == "CHALLENGE_REQUIRED":
+            self.challenges.start(tab, url, self.pages[tab].url)
+        else:
+            self.challenges.forget(tab)
+        if changed:
+            self.invalidate(tab)
 
     def check_site_pause(self, url):
         site = urlsplit(url).hostname
@@ -234,7 +264,7 @@ class BrowserSession:
         try:
             return await self.verification.check(tab, page)
         except StealthishError as error:
-            if error.code in {"CHALLENGE_REQUIRED", "AUTH_REQUIRED", "CONSENT_REQUIRED"}:
+            if error.code in PAUSE_CODES:
                 self.pause(tab, error.code, initiating_url or page.url, error)
             raise
         except BaseException:
@@ -271,9 +301,22 @@ class BrowserSession:
             # Keep Python task cancellation. Never replay a partially sent action.
             raise
         except StealthishError as error:
-            paused = error.code in {"CHALLENGE_REQUIRED", "AUTH_REQUIRED", "CONSENT_REQUIRED", "MANUAL_ACCESS"}
+            paused = error.code in PAUSE_CODES | {"MANUAL_ACCESS"}
             result = Result(request.id, status="paused" if paused else "error", code=error.code,
                             effect=self.effect, data={"message": str(error), **error.data})
+            tab = error.data.get("tabId")
+            if paused and self.config.headless and tab in self.pages:
+                try:
+                    async with asyncio.timeout(15):
+                        observed = await self.challenges.result(self, tab, self.pages[tab], request.id)
+                    # Keep the navigation record, but show the current page state.
+                    observed.data = {**error.data, **observed.data}
+                    result = observed
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    result.data["challenge"] = self.challenges.info(tab)
+                    result.warnings.append("The page image was not captured. Request a screenshot before input.")
         except TimeoutError:
             result = Result(request.id, status="error", code="TIMEOUT", effect=self.effect)
         except Exception as error:
@@ -324,6 +367,9 @@ class BrowserSession:
             self.pause_errors.clear()
             self.verification = Verification()
             self.refs = References()
+            self.images = Observations()
+            self.challenges = Challenges(self.config)
+            self.pending_search.clear()
             self._lock.close()
             self._closing = False
 

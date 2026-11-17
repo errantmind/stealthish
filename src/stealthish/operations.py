@@ -1,6 +1,5 @@
 """Browser operations shared by both interfaces. No raw JavaScript operation."""
 import asyncio
-import secrets
 
 from .artifacts import requested, save_text
 from .errors import StealthishError
@@ -36,6 +35,31 @@ def navigation_options(config, params):
             type(timeout) not in {int, float} or not 1 <= timeout <= 600000:
         raise StealthishError("INVALID_REQUEST")
     return {"wait_until": wait, "timeout": timeout}
+
+
+async def collect_search(session, tab, page, request_id, params, *, wait=True):
+    """Read the existing results page. This function never navigates."""
+    result = Result(request_id, effect="applied")
+    engine = params.get("engine", session.config.search_engine)
+    length = limit(session.config, params)
+    data, result.truncation, result.warnings, full = await search.collect(page, length, engine)
+    if wait and data["kind"] == "fallback":
+        info = search.engine_info(engine)
+        try:
+            await page.locator(info["containers"]).first.wait_for(
+                state="visible", timeout=min(params.get("timeoutMs", 15000), 15000))
+        except Exception:
+            pass
+        await session.check_pause(tab, page)
+        data, result.truncation, result.warnings, full = await search.collect(page, length, engine)
+    while await session.check_pause(tab, page):
+        data, result.truncation, result.warnings, full = await search.collect(page, length, engine)
+    if tab in session.verification.attempts:
+        session.verification.attempts[tab]["parserOutcome"] = data["kind"]
+    result.data = {**await tabs.context(session, tab), "engine": engine, "url": page.url, **data}
+    if requested(params, "saveOnTruncation") and result.truncation["truncated"]:
+        result.data["artifact"] = save_text(session.config, full, "txt")
+    return result
 
 
 async def execute(session, request):
@@ -82,27 +106,19 @@ async def execute(session, request):
         target["url"] = url
         if "tabId" not in params:
             target.setdefault("tabPolicy", "reuse-domain")
-        navigated = await execute(session, Request(request.id, "navigate", target))
+        collection = {"engine": engine, "maxChars": length,
+                      "saveOnTruncation": requested(params, "saveOnTruncation")}
+        try:
+            navigated = await execute(session, Request(request.id, "navigate", target))
+        except StealthishError as error:
+            tab = error.data.get("tabId")
+            if session.effect == "applied" and tab in session.pages:
+                session.pending_search[tab] = collection
+            raise
         tab, page = session.page({"tabId": navigated.data["tabId"]})
-        data, result.truncation, result.warnings, full = await search.collect(page, length, engine)
-        if data["kind"] == "fallback":
-            info = search.engine_info(engine)
-            try:
-                await page.locator(info["containers"]).first.wait_for(
-                    state="visible", timeout=min(params.get("timeoutMs", 15000), 15000))
-            except Exception:
-                pass
-            await session.check_pause(tab, page, url)
-            data, result.truncation, result.warnings, full = await search.collect(page, length, engine)
-        while await session.check_pause(tab, page, url):
-            # Re-read after an automatic redirect; never resubmit the search.
-            data, result.truncation, result.warnings, full = await search.collect(page, length, engine)
-        if tab in session.verification.attempts:
-            session.verification.attempts[tab]["parserOutcome"] = data["kind"]
-        result.data = {**await tabs.context(session, tab), "engine": engine, "url": page.url, **data}
-        if requested(params, "saveOnTruncation") and result.truncation["truncated"]:
-            result.data["artifact"] = save_text(config, full, "txt")
-        result.effect = "applied"
+        session.pending_search[tab] = collection
+        result = await collect_search(session, tab, page, request.id, params)
+        session.pending_search.pop(tab, None)
         return result
     if op == "tabs":
         action = params.get("action", "list")
@@ -144,7 +160,8 @@ async def execute(session, request):
             session.check_site_pause(url)
         tab, page = await tabs.choose(session, url, policy, params.get("tabId"))
         await session.check_pause(tab, page)
-        session.refs.invalidate(tab)
+        session.invalidate(tab)
+        session.pending_search.pop(tab, None)
         session.effect = "unknown"
         if action == "goto":
             await page.goto(url, **options)
@@ -162,6 +179,17 @@ async def execute(session, request):
         return result
 
     tab, page = session.page(params)
+    if op == "screenshot" or (op == "interact" and params.get("action") == "wait"):
+        delay = params.get("waitAfterMs", 0)
+        if type(delay) not in {int, float} or not 0 <= delay <= 10000:
+            raise StealthishError("INVALID_REQUEST")
+        if delay and op == "screenshot":
+            await asyncio.sleep(delay / 1000)
+    if op == "interact" and "verificationId" in params:
+        return await session.challenges.interact(session, tab, page, request)
+    if tab in session.paused and op in {"screenshot", "snapshot"}:
+        return await session.challenges.result(session, tab, page, request.id,
+                                               snapshot=op == "snapshot", params=params)
     if op == "resume":
         if params.get("confirmed") is not True:
             raise StealthishError("INVALID_REQUEST")
@@ -172,13 +200,7 @@ async def execute(session, request):
                                              "still-present" if signal.automatic else "human-required", state)
         if not state["ready"]:
             raise StealthishError("TIMEOUT")
-        session.paused.pop(tab, None)
-        session.pause_errors.pop(tab, None)
-        session.verification.forget(tab)
-        site = session.pause_origins.pop(tab, None)
-        if site and site not in session.pause_origins.values():
-            session.paused_sites.discard(site)
-        return result
+        return await session.challenges.result(session, tab, page, request.id)
     await session.check_pause(tab, page)
     if op == "snapshot":
         length = limit(config, params)
@@ -209,9 +231,17 @@ async def execute(session, request):
         if type(delay) not in {int, float} or not 0 <= delay <= 30000:
             raise StealthishError("INVALID_REQUEST")
         raw = session.refs.resolve(tab, params["ref"]) if "ref" in params else None
+        point = None
+        if "imageId" in params:
+            await session.images.validate(tab, page, params["imageId"])
+        if params.get("action") in {"click", "hover"} and ("x" in params or "y" in params):
+            point = await session.images.point(tab, page, params.get("imageId"), params.get("x"), params.get("y"))
         before = set(session.pages)
-        session.effect = "unknown"
-        await session.input.perform(page, params, raw)
+        session.invalidate(tab)
+        if params.get("action") != "wait":
+            session.effect = "unknown"
+            await session.input.perform(page, params, raw, point=point)
+            session.effect = "applied"
         if delay:
             await asyncio.sleep(delay / 1000)
         if session._popup_tasks:
@@ -222,18 +252,15 @@ async def execute(session, request):
         elif page.is_closed():
             tab, page = session.page({}) if session.pages else await session.new_page()
         await session.check_pause(tab, page)
-        result.effect = "applied"
+        result.effect = session.effect
+        if "imageId" in params or params.get("action") == "wait":
+            result.data["image"] = await session.images.capture(tab, page, config.data_dir / "artifacts")
         if params.get("action") in {"scroll", "key"}:
             result.warnings.append("Direct wheel/global key input has limited humanization.")
     elif op == "screenshot":
-        full = params.get("fullPage", True)
-        if type(full) is not bool:
-            raise StealthishError("INVALID_REQUEST")
-        path = config.data_dir / "artifacts" / (secrets.token_hex(16) + ".png")
-        await page.screenshot(path=str(path), full_page=full)
-        path.chmod(0o600)
-        result.data = {"path": str(path), "format": "png"}
-        result.effect = "applied"
+        image = await session.images.capture(tab, page, config.data_dir / "artifacts",
+                                             full=params.get("fullPage", False), clip=params.get("clip"))
+        result.data = {"path": image["path"], "format": "png", "image": image}
     else:
         raise StealthishError("UNSUPPORTED")
     result.data.update(await tabs.context(session, tab))
